@@ -49,3 +49,7 @@ eagle.epf
 
 # file locks introduced since 7.x
 *.lck
+CCGS_WASM/C_CPP_tests/data.csv
+CCGS_WASM/C_CPP_tests/primes - Copy.txt
+CCGS_WASM/C_CPP_tests/primes.txt
+CCGS_WASM/C_CPP_tests/fraudTrain.csv
