@@ -12,7 +12,9 @@ const log = (message) => {
     logDiv.scrollTop = logDiv.scrollHeight;
 };
 
-// const socket = new WebSocket('ws://localhost:8080'); // Remember to use your IP
+// const socket = new WebSocket('ws://localhost:8080'); // Remember to use your IP 
+//192.168.1.107
+//192.168.59.244
 const socket = new WebSocket('ws://192.168.1.107:8080');
 socket.onopen = () => {
     log('✅ Connected. Registering as Director...');
