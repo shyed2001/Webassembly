@@ -4,8 +4,9 @@ let wasmModule = null;
 
 statusDiv.textContent = 'Connecting to coordinator...';
 // Remember to use your actual IP address here if testing on other devices
-const socket = new WebSocket('ws://localhost:8080'); 
+// const socket = new WebSocket('ws://localhost:8080'); 
 
+const socket = new WebSocket('ws://192.168.1.107:8080'); 
 socket.onopen = () => {
     statusDiv.textContent = '✅ Connected. Awaiting tasks.';
     socket.send(JSON.stringify({ type: 'registerWorker' }));
