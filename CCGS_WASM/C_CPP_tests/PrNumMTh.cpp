@@ -1,3 +1,5 @@
+// PrNumMTh.cpp
+// This program finds all prime numbers up to a specified limit using a multi-threaded approach.
 #include <iostream>
 #include <vector>
 #include <chrono>
@@ -78,7 +80,11 @@ int main() {
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
-    std::cout << "Multi-Threaded: " << count << " primes found up to " << N << std::endl;
+    std::cout << "Multi-Threaded: "<< num_threads << " threads: " << count << " primes found up to " << N << std::endl;
     std::cout << "Time: " << duration.count() << " seconds" << std::endl;
     return 0;
 }
+
+// Compilation command: clang++ -O3 -std=c++17 -fopenmp PrNumMTh.cpp -o PrNumMTh.exe
+// Execution command: ./PrNumMTh.exe
+// Note: Ensure to adjust the value of N for practical runtime and output size.

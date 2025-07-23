@@ -23,11 +23,12 @@ void sieve_segment(long long low, long long high, const std::vector<long long>& 
         if (is_prime_seg[i]) local_count++;
     }
 }
-
+ 
 int main() {
-    long long N = 4000000000; // 10^10; use LL suffix for clarity
+    long long N = 400000000000LL; 
+               // 40000000000 10^10; use LL suffix for clarity
     auto start = std::chrono::high_resolution_clock::now();
-
+    
     // Step 1: Small primes up to sqrt(N)
     long long sqrt_n = static_cast<long long>(std::sqrt(N));
     std::vector<bool> small_is_prime(sqrt_n + 1, true);
@@ -44,7 +45,7 @@ int main() {
     for (long long i = 2; i <= sqrt_n; ++i) {
         if (small_is_prime[i]) small_primes.push_back(i);
     }
-
+// panel.riyadwebhost01840395957
     // Step 2: Parallel segmented sieve
     int num_threads = omp_get_max_threads();
     long long seg_size = (N - 1) / num_threads + 1;
@@ -106,7 +107,8 @@ int main() {
 
 
 /* 
-PS F:\GitHubDesktop\GitHubCloneFiles\Webassembly\CCGS_WASM\C_CPP_tests> g++ -O3 -std=c++17 -fopenmp -march=native PrNumMthrPrll.cpp -o PrNumMthrPllexec
+PS F:\GitHubDesktop\GitHubCloneFiles\Webassembly\CCGS_WASM\C_CPP_tests> g++ -O3 -std=c++17 -fopenmp -march=native PrNumMthrPrll.cpp -o PrNumMthrPllexec.exe
+clang++ -O3 -std=c++17 -fopenmp -march=native PrNumMthrPrll.cpp -o PrNumMthrPllexec.exe
 PS F:\GitHubDesktop\GitHubCloneFiles\Webassembly\CCGS_WASM\C_CPP_tests> $env:OMP_NUM_THREADS=8; .\PrNumMthrPllexec
 Parallel (OpenMP): 455052510 primes found up to 10000000000
 Threads Used: 8
