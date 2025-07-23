@@ -20,7 +20,7 @@ void sieve_segment(long long low, long long high, const std::vector<long long>& 
 }
 
 int main() {
-    long long N = 1000000000; // Adjust as needed
+    long long N = 4000000000; // Adjust as needed
     int num_threads = 4; // Adjust based on cores
     auto start = std::chrono::high_resolution_clock::now();
 

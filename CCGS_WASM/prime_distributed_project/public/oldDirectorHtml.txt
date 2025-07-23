@@ -1,0 +1,70 @@
+
+<!-- 
+
+
+       
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Director Control Panel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>👑 Director Control Panel</h1>
+    <button id="start-btn">Start Computation</button>
+    
+    <div class="results-area">
+        <h3>Live Progress</h3>
+        <p>Tasks Completed: <strong id="tasks-completed">0 / 10</strong> | Primes Found So Far: <strong id="running-total">0</strong></p>
+        <div id="progress-container"></div>
+    </div>
+    
+    <div class="workers-area">
+        <h3>Connected Workers (<span id="worker-count">0</span>)</h3>
+        <table id="worker-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>CPU Cores</th>
+                    <th>RAM (GB)</th>
+                    <th>Current Task</th>
+                    <th>Last Task Time (ms)</th>
+                    <th>Browser / OS</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <pre id="log">Connecting to coordinator...</pre>
+    <script src="director.js" type="module"></script>
+</body>
+</html>
+
+
+
+ 
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Director Control Panel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>👑 Director Control Panel</h1>
+    <button id="start-btn">Start Computation</button>
+    <div class="results-area">
+        <h3>Live Progress</h3>
+        <p>Tasks Completed: <strong id="tasks-completed">0 / 10</strong></p>
+        <p>Primes Found So Far: <strong id="running-total">0</strong></p>
+        <div id="progress-container"></div>
+    </div>
+    <pre id="log">Connecting to coordinator...</pre>
+    <script src="director.js" type="module"></script>
+</body>
+</html> -->

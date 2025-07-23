@@ -47,7 +47,7 @@ void sieve_segment(long long low, long long high, const std::vector<long long>& 
 }
 
 int main() {
-    long long N = 1000000000LL; // 10^12; adjust for 7-10 min (test small first)
+    long long N = 40000000000LL; // 10^12; adjust for 7-10 min (test small first)
     auto start = std::chrono::high_resolution_clock::now();
 
     long long sqrt_n = static_cast<long long>(std::sqrt(N));

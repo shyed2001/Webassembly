@@ -5,7 +5,7 @@
 #include <fstream>
 
 int main() {
-    long long N = 10000000000; // Adjust for ~5-10 min runtime
+    long long N = 4000000000; // Adjust for ~5-10 min runtime
     auto start = std::chrono::high_resolution_clock::now();
 
     std::vector<bool> is_prime(N+1, true);

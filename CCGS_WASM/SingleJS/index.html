@@ -1,0 +1,41 @@
+<h1 class="header">Distributed Prime Computation</h1>
+
+<!-- Director Section -->
+<div class="container flex flex-col items-center">
+    <h2 class="section-title w-full text-center">Director Control Panel</h2>
+    <button id="start-btn" class="btn btn-primary mt-4">Start Computation</button>
+    
+    <div class="mt-6 w-full">
+        <p class="font-bold mb-2">Tasks Completed: <span id="tasks-completed">0 / 10</span></p>
+        <p class="font-bold mb-2">Running Total Primes: <span id="running-total">0</span></p>
+        <div id="progress-container" class="progress-container">
+            <!-- Progress bars will be inserted here by JS -->
+        </div>
+    </div>
+
+    <div class="mt-6 w-full">
+        <h3 class="font-bold mb-2">Director Log:</h3>
+        <div id="log" class="log-area"></div>
+    </div>
+</div>
+
+<!-- Worker Section -->
+<div class="container flex flex-col items-center mt-8">
+    <h2 class="section-title w-full text-center">Worker Status</h2>
+    <div id="status" class="status-box mt-4 w-full">Connecting to coordinator...</div>
+</div>
+
+<!-- Director Client Script -->
+<script>
+    // Director Client JavaScript
+    const startBtn = document.getElementById('start-btn');
+    const logDiv = document.getElementById('log');
+    const progressContainer = document.getElementById('progress-container');
+    const tasksCompletedSpan = document.getElementById('tasks-completed');
+    const runningTotalSpan = document.getElementById('running-total');
+
+    const TOTAL_TASKS = 10;
+    let runningTotal = 0;
+
+    const log = (message) => {
+        logDiv.textContent += message + '

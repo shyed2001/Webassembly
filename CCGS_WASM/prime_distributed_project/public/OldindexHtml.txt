@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Prime Computation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1000px; /* Increased max-width for more info */
+        }
+        .header {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #2980b9;
+            transform: translateY(-1px);
+        }
+        .btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .log-area {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'monospace';
+            height: 200px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.9rem;
+        }
+        .progress-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .progress-bar {
+            background-color: #bdc3c7;
+            color: #2c3e50;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            flex-grow: 1;
+            text-align: center;
+            min-width: 120px;
+            transition: background-color 0.3s ease;
+        }
+        .status-box {
+            background-color: #ecf0f1;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            color: #2c3e50;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .text-green-500 { color: #28a745; }
+        .text-red-500 { color: #dc3545; }
+        .text-blue-500 { color: #007bff; }
+    </style>
+</head>
+<body class="flex flex-col items-center">
+
+    <h1 class="header">Distributed Prime Computation</h1>
+
+    <!-- Director Section -->
+    <div class="container flex flex-col items-center">
+        <h2 class="section-title w-full text-center">Director Control Panel</h2>
+        <button id="start-btn" class="btn btn-primary mt-4">Start Computation</button>
+        
+        <div class="mt-6 w-full">
+            <p class="font-bold mb-2">Tasks Completed: <span id="tasks-completed">0 / 10</span></p>
+            <p class="font-bold mb-2">Running Total Primes: <span id="running-total">0</span></p>
+            <div id="progress-container" class="progress-container">
+                <!-- Progress bars will be inserted here by JS -->
+            </div>
+        </div>
+
+        <div class="mt-6 w-full">
+            <h3 class="font-bold mb-2">Connected Workers: <span id="connected-workers-count">0</span></h3>
+            <div class="overflow-x-auto">
+                <table id="workers-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>Current Task</th>
+                            <th>Tasks Done</th>
+                            <th>Primes Found</th>
+                            <th>Last Task Time</th>
+                            <th>Browser/OS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Worker rows will be inserted here by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-6 w-full">
+            <h3 class="font-bold mb-2">Director Log:</h3>
+            <div id="log" class="log-area"></div>
+        </div>
+    </div>
+
+    <!-- Worker Section -->
+    <div class="container flex flex-col items-center mt-8">
+        <h2 class="section-title w-full text-center">Worker Status</h2>
+        <div id="worker-id-display" class="text-lg font-bold mt-2">Worker ID: <span id="my-worker-id">N/A</span></div>
+        <div class="status-box mt-4 w-full">Connecting to coordinator...</div>
+        <div class="mt-4 w-full text-center">
+            <p class="font-bold">Tasks Completed by me: <span id="my-tasks-completed">0</span></p>
+            <p class="font-bold">Primes Found by me: <span id="my-primes-found">0</span></p>
+        </div>
+    </div>
+
+    <!-- Director Client Script -->
+    <script>
+        // Director Client JavaScript
+        const startBtn = document.getElementById('start-btn');
+        const logDiv = document.getElementById('log');
+        const progressContainer = document.getElementById('progress-container');
+        const tasksCompletedSpan = document.getElementById('tasks-completed');
+        const runningTotalSpan = document.getElementById('running-total');
+        const connectedWorkersCountSpan = document.getElementById('connected-workers-count');
+        const workersTableBody = document.getElementById('workers-table').getElementsByTagName('tbody')[0];
+
+        const TOTAL_TASKS = 10;
+        let runningTotal = 0;
+        const workerStats = new Map(); // Store worker stats for the table
+
+        const log = (message) => {
+            logDiv.textContent += message + '\n';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        // !!! IMPORTANT: REPLACE 'YOUR_LOCAL_IP_ADDRESS' WITH YOUR ACTUAL WINDOWS MACHINE'S IP !!!
+        // You can find this by running 'ipconfig' in Command Prompt/PowerShell.
+        // Example: 'ws://192.168.1.106:8080' (use ws:// because you're serving HTML via HTTP)
+        const COORDINATOR_WS_URL = 'ws://192.168.1.106:8080'; // <--- REPLACE THIS LINE!
+
+        let socket; // Declare socket here so it can be re-initialized if needed
+
+        function updateWorkersTable() {
+            workersTableBody.innerHTML = ''; // Clear existing rows
+            let connectedCount = 0;
+            workerStats.forEach((info, id) => {
+                connectedCount++;
+                const row = workersTableBody.insertRow();
+                row.id = `worker-row-${id}`;
+                const statusClass = info.status === 'Idle' ? 'text-green-500' : 
+                                    info.status === 'Busy' ? 'text-blue-500' : 
+                                    info.status === 'Error' ? 'text-red-500' : '';
+                
+                row.insertCell().textContent = id.substring(0, 8) + '...'; // Truncate ID for display
+                row.insertCell().innerHTML = `<span class="${statusClass}">${info.status}</span>`;
+                row.insertCell().textContent = info.currentTask !== null ? `Task ${info.currentTask}` : 'N/A';
+                row.insertCell().textContent = info.stats.tasksCompleted;
+                row.insertCell().textContent = info.stats.primesFound.toLocaleString();
+                row.insertCell().textContent = info.stats.lastTaskTime ? new Date(info.stats.lastTaskTime).toLocaleTimeString() : 'N/A';
+                row.insertCell().textContent = info.browserInfo;
+            });
+            connectedWorkersCountSpan.textContent = connectedCount;
+        }
+
+        function connectDirectorSocket() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close(); // Close existing connection if open
+            }
+            log('Attempting to connect Director to coordinator...');
+            socket = new WebSocket(COORDINATOR_WS_URL);
+
+            socket.onopen = () => {
+                log('✅ Connected. Registering as Director...');
+                socket.send(JSON.stringify({ type: 'registerDirector' }));
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                switch(data.type) {
+                    case 'log':
+                        log(data.message);
+                        break;
+                    case 'progress':
+                        const bar = document.getElementById(`bar-${data.taskId}`);
+                        if (bar) {
+                            bar.style.backgroundColor = '#2ecc71'; // Green
+                            bar.textContent = `Task ${data.taskId}: Done (${data.count.toLocaleString()})`;
+                        }
+                        runningTotal += data.count;
+                        tasksCompletedSpan.textContent = `${data.totalCompleted} / ${TOTAL_TASKS}`;
+                        runningTotalSpan.textContent = runningTotal.toLocaleString();
+                        break;
+                    case 'complete':
+                        log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${data.totalPrimes.toLocaleString()}`);
+                        startBtn.disabled = false;
+                        startBtn.textContent = 'Start Computation';
+                        break;
+                    case 'workerUpdate':
+                        // Update or add worker info to the map
+                        workerStats.set(data.workerId, data.workerInfo);
+                        updateWorkersTable();
+                        break;
+                    case 'workerRemoved':
+                        workerStats.delete(data.workerId);
+                        updateWorkersTable();
+                        break;
+                }
+            };
+
+            socket.onclose = () => {
+                log('❌ Director disconnected from coordinator. Please ensure coordinator is running and refresh to reconnect.');
+                startBtn.disabled = true; // Disable button on disconnect
+                startBtn.textContent = 'Disconnected';
+                workerStats.clear(); // Clear worker stats on disconnect
+                updateWorkersTable();
+            };
+
+            socket.onerror = (error) => {
+                console.error('Director WebSocket Error:', error);
+                log('❌ Director WebSocket error. Check console for details.');
+            };
+        }
+
+        // Initial connection attempt for Director
+        connectDirectorSocket();
+
+        startBtn.onclick = () => {
+            if (socket.readyState !== WebSocket.OPEN) {
+                log('Not connected to coordinator. Attempting to reconnect...');
+                connectDirectorSocket();
+                return;
+            }
+
+            log('Sending command to start computation...');
+            startBtn.disabled = true;
+            startBtn.textContent = 'Computation Running...';
+            
+            // Reset UI
+            progressContainer.innerHTML = '';
+            runningTotal = 0;
+            tasksCompletedSpan.textContent = `0 / ${TOTAL_TASKS}`;
+            runningTotalSpan.textContent = '0';
+            workersTableBody.innerHTML = ''; // Clear worker table
+            workerStats.clear();
+            connectedWorkersCountSpan.textContent = '0';
+
+
+            // Create placeholder bars
+            for (let i = 0; i < TOTAL_TASKS; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'progress-bar';
+                bar.id = `bar-${i}`;
+                bar.textContent = `Task ${i}: Waiting...`;
+                progressContainer.appendChild(bar);
+            }
+
+            socket.send(JSON.stringify({ type: 'startComputation' }));
+        };
+    </script>
+
+    <!-- Worker Client Script -->
+    <script type="module">
+        // Worker Client JavaScript
+        import wasmFactory from './prime_library.js'; // Ensure this path is correct relative to index.html
+        const statusDiv = document.getElementById('status');
+        const myWorkerIdSpan = document.getElementById('my-worker-id');
+        const myTasksCompletedSpan = document.getElementById('my-tasks-completed');
+        const myPrimesFoundSpan = document.getElementById('my-primes-found');
+
+        let wasmModule = null;
+        let myWorkerId = null; // Unique ID for this worker instance
+        let myTasksCompleted = 0;
+        let myPrimesFound = 0;
+
+        // !!! IMPORTANT: REPLACE 'YOUR_LOCAL_IP_ADDRESS' WITH YOUR ACTUAL WINDOWS MACHINE'S IP !!!
+        // This MUST be the same IP as in the Director script.
+        const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.106:8080'; // <--- REPLACE THIS LINE!
+
+        let workerSocket; // Declare socket here so it can be re-initialized if needed
+
+        // Function to generate a simple unique ID (for browser session)
+        function generateWorkerId() {
+            return 'worker-' + Math.random().toString(36).substring(2, 11);
+        }
+
+        function getBrowserInfo() {
+            const userAgent = navigator.userAgent;
+            let browser = "Unknown Browser";
+            let os = "Unknown OS";
+
+            if (userAgent.includes("Firefox")) browser = "Firefox";
+            else if (userAgent.includes("SamsungBrowser")) browser = "Samsung Browser";
+            else if (userAgent.includes("Opera") || userAgent.includes("Opr")) browser = "Opera";
+            else if (userAgent.includes("Edge")) browser = "Edge";
+            else if (userAgent.includes("Chrome")) browser = "Chrome";
+            else if (userAgent.includes("Safari")) browser = "Safari";
+
+            if (userAgent.includes("Windows")) os = "Windows";
+            else if (userAgent.includes("Android")) os = "Android";
+            else if (userAgent.includes("iPhone") || userAgent.includes("iPad")) os = "iOS";
+            else if (userAgent.includes("Mac")) os = "macOS";
+            else if (userAgent.includes("Linux")) os = "Linux";
+
+            return `${browser} on ${os}`;
+        }
+
+        function connectWorkerSocket() {
+            if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
+                workerSocket.close(); // Close existing connection if open
+            }
+            statusDiv.textContent = 'Connecting to coordinator...';
+            myWorkerId = generateWorkerId(); // Generate ID on connect
+            myWorkerIdSpan.textContent = myWorkerId; // Display my ID
+            
+            workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
+
+            workerSocket.onopen = () => {
+                statusDiv.textContent = '✅ Connected. Awaiting tasks.';
+                // Send unique worker ID and browser info on registration
+                workerSocket.send(JSON.stringify({ type: 'registerWorker', workerId: myWorkerId, browserInfo: getBrowserInfo() }));
+            };
+
+            workerSocket.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type !== 'task') return;
+
+                const { task } = data;
+                statusDiv.textContent = `Computing task #${task.taskId} (${task.start.toLocaleString()} to ${task.end.toLocaleString()})...`;
+
+                try {
+                    if (!wasmModule) {
+                        statusDiv.textContent = `Loading WASM Module for task #${task.taskId}...`;
+                        wasmModule = await wasmFactory(); // Load WASM module
+                    }
+                    
+                    const functionToCall = `worker_func_${task.taskId}`; // Assuming functions are named worker_func_0, worker_func_1 etc.
+                    
+                    statusDiv.textContent = `Executing C++ for task #${task.taskId}...`;
+                    
+                    // Call the WASM function
+                    const primeCount = wasmModule.ccall(
+                        functionToCall,
+                        'number',
+                        ['number', 'number'],
+                        [task.start, task.end]
+                    );
+                    
+                    // Send result along with worker ID
+                    workerSocket.send(JSON.stringify({ type: 'result', workerId: myWorkerId, taskId: task.taskId, count: primeCount }));
+                    
+                    // Update my own stats
+                    myTasksCompleted++;
+                    myPrimesFound += primeCount;
+                    myTasksCompletedSpan.textContent = myTasksCompleted;
+                    myPrimesFoundSpan.textContent = myPrimesFound.toLocaleString();
+
+                    statusDiv.textContent = '✅ Task complete. Awaiting next task.';
+
+                } catch (error) {
+                    console.error(`Error executing task ${task.taskId} on worker ${myWorkerId}:`, error);
+                    statusDiv.textContent = `❌ Error on task #${task.taskId}. Reporting to server.`;
+                    
+                    // Report error along with worker ID
+                    workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: task.taskId, message: error.message }));
+                }
+            };
+
+            workerSocket.onclose = () => {
+                statusDiv.textContent = '❌ Disconnected from coordinator. Please refresh the page to reconnect.';
+            };
+
+            workerSocket.onerror = (error) => {
+                console.error('Worker WebSocket Error:', error);
+                statusDiv.textContent = '❌ Worker WebSocket error. Check console for details.';
+            };
+        }
+
+        // Initial connection attempt for Worker
+        connectWorkerSocket();
+    </script>
+
+<!-- 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Prime Worker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Prime Worker</h1>
+    <div id="status">Connecting to coordinator...</div>
+    <div class="stats-box">
+        <h4>My Reported Stats</h4>
+        <div id="stats"></div>
+    </div>
+    <script src="worker.js" type="module"></script>
+</body>
+</html>
+
+<!--
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Prime Worker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Prime Worker</h1>
+    <div id="status">Connecting to coordinator...</div>
+    <script src="worker.js" type="module"></script>
+</body>
+</html>
+-->

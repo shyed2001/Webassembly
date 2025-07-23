@@ -1,0 +1,977 @@
+// coordinator_server.js
+import { WebSocketServer } from 'ws';
+
+const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
+console.log('Coordinator server running on ws://0.0.0.0:8080');
+console.log('Ensure Windows Firewall allows connections on port 8080.');
+
+const N = 400000000;
+const TOTAL_TASKS = 10;
+
+let directorSocket = null; // Stores the WebSocket connection for the Director client
+const workers = new Map(); 
+const taskQueue = [];
+let results = [];
+let isRunning = false;
+let computationStartTime = null;
+
+function logToDirector(message) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'log', message: `[${new Date().toLocaleTimeString()}] ${message}` }));
+    }
+}
+
+function updateDirectorProgress(taskId, count, totalCompleted) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'progress', taskId, count, totalCompleted }));
+    }
+}
+
+function updateDirectorWorkerInfo(workerId, workerInfo) {
+    if (directorSocket && directorSocket.readyState === WebSocket.OPEN) { // Ensure directorSocket is open
+        directorSocket.send(JSON.stringify({ type: 'workerUpdate', workerId, workerInfo }));
+    } else {
+        console.warn(`[Coordinator] Cannot send workerUpdate for ${workerId}: Director not connected or socket closed.`); // DEBUG
+    }
+}
+
+function notifyDirectorComplete(totalPrimes) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'complete', totalPrimes }));
+    }
+}
+
+function initializeTasks() {
+    taskQueue.length = 0;
+    results = new Array(TOTAL_TASKS).fill(null);
+    const chunkSize = Math.floor(N / TOTAL_TASKS);
+    for (let i = 0; i < TOTAL_TASKS; i++) {
+        const start = i * chunkSize + 1;
+        const effectiveStart = (i === 0 && start === 1) ? 2 : start; 
+        const end = (i === TOTAL_TASKS - 1) ? N : (i + 1) * chunkSize; 
+        taskQueue.push({ taskId: i, start: effectiveStart, end });
+    }
+    logToDirector(`Task queue created with ${taskQueue.length} tasks.`);
+    console.log(`[Coordinator] Task queue initialized: ${taskQueue.length} tasks.`);
+}
+
+function assignTaskToAvailableWorker() {
+    if (taskQueue.length === 0) {
+        console.log('[Coordinator] No tasks in queue to assign.');
+        return;
+    }
+
+    for (const [workerId, workerData] of workers.entries()) {
+        if (!workerData.isBusy) {
+            const task = taskQueue.shift();
+            if (task) {
+                workerData.isBusy = true;
+                workerData.assignedTask = task;
+                workerData.ws.send(JSON.stringify({ type: 'task', task }));
+                logToDirector(`Assigned task ${task.taskId} to worker ${workerId.substring(0, 8)}...`); // Truncate ID for log
+                console.log(`[Coordinator] Assigned task ${task.taskId} to worker ${workerId}.`);
+                
+                updateDirectorWorkerInfo(workerId, { 
+                    status: 'Busy', 
+                    currentTask: task.taskId,
+                    stats: workerData.stats,
+                    browserInfo: workerData.browserInfo
+                });
+                return;
+            } else {
+                console.log('[Coordinator] Task queue became empty during assignment loop.');
+                break;
+            }
+        }
+    }
+    if (taskQueue.length > 0 && Array.from(workers.values()).every(w => w.isBusy)) {
+        console.log(`[Coordinator] All workers are busy. ${taskQueue.length} tasks still in queue.`);
+        logToDirector(`All workers busy. ${taskQueue.length} tasks remaining.`);
+    }
+}
+
+wss.on('connection', ws => {
+    // Assign a type to the WebSocket for easier tracking on close
+    ws.type = 'unknown'; 
+
+    ws.on('message', message => {
+        const data = JSON.parse(message);
+        
+        switch (data.type) {
+            case 'registerDirector':
+                // If a director is already connected, disconnect the old one
+                if (directorSocket && directorSocket.readyState === WebSocket.OPEN) {
+                    console.log('Existing Director detected. Closing old connection.');
+                    logToDirector('Another Director connected. This Director instance will take control.');
+                    directorSocket.close(); // Close the old connection
+                }
+                directorSocket = ws; // Set the new Director socket
+                ws.type = 'director'; // Mark this socket as director
+                console.log('Director has connected.');
+                logToDirector('👑 You are the Director. Ready to start.');
+                
+                // Send initial worker states to new director (for any workers already connected)
+                workers.forEach((workerData, workerId) => {
+                    updateDirectorWorkerInfo(workerId, {
+                        status: workerData.isBusy ? 'Busy' : 'Idle',
+                        currentTask: workerData.assignedTask ? workerData.assignedTask.taskId : null,
+                        stats: workerData.stats,
+                        browserInfo: workerData.browserInfo 
+                    });
+                });
+                logToDirector(`Currently ${workers.size} workers connected.`);
+                break;
+
+            case 'registerWorker':
+                const workerId = data.workerId;
+                if (!workerId) {
+                    console.error('Worker registration without ID received.');
+                    ws.close();
+                    return;
+                }
+                
+                // If worker already exists (e.g., refresh), update its ws object
+                if (workers.has(workerId)) {
+                    console.log(`Worker ${workerId} re-registered. Updating WebSocket object.`);
+                    const existingWorkerData = workers.get(workerId);
+                    existingWorkerData.ws = ws; // Update the WS object
+                    ws.workerId = workerId; // Attach ID to new WS object
+                    ws.type = 'worker'; // Mark this socket as worker
+                    logToDirector(`Worker ${workerId} reconnected.`);
+                    // Send updated status to Director
+                    updateDirectorWorkerInfo(workerId, { 
+                        status: existingWorkerData.isBusy ? 'Busy' : 'Idle', 
+                        currentTask: existingWorkerData.assignedTask ? existingWorkerData.assignedTask.taskId : null, 
+                        stats: existingWorkerData.stats,
+                        browserInfo: existingWorkerData.browserInfo
+                    });
+                } else {
+                    // New worker registration
+                    workers.set(workerId, { 
+                        ws: ws, 
+                        isBusy: false, 
+                        assignedTask: null, 
+                        stats: { tasksCompleted: 0, primesFound: 0, lastTaskTime: null },
+                        browserInfo: data.browserInfo || 'Unknown Browser/OS' 
+                    });
+                    ws.workerId = workerId; 
+                    ws.type = 'worker'; // Mark this socket as worker
+
+                    console.log(`Worker ${workerId} registered. Total workers: ${workers.size}`);
+                    logToDirector(`Worker ${workerId} connected. Total workers: ${workers.size}`);
+                    
+                    // Send update to Director about THIS new worker
+                    updateDirectorWorkerInfo(workerId, { 
+                        status: 'Idle', 
+                        currentTask: null, 
+                        stats: workers.get(workerId).stats,
+                        browserInfo: workers.get(workerId).browserInfo
+                    });
+                }
+
+                // If computation is running, try to assign a task immediately
+                if (isRunning && taskQueue.length > 0) { 
+                    console.log(`[Coordinator] Worker ${workerId} registered while running, attempting to assign task.`);
+                    assignTaskToAvailableWorker();
+                } else if (isRunning && taskQueue.length === 0) {
+                    console.log(`[Coordinator] Worker ${workerId} registered, but no tasks left.`);
+                }
+                break;
+
+            case 'startComputation':
+                if (isRunning) {
+                    logToDirector('Computation is already running.');
+                    console.log('[Coordinator] Start computation requested, but already running.');
+                    return;
+                }
+                computationStartTime = Date.now();
+                console.log('Director started the computation.');
+                logToDirector(`Starting new computation at ${new Date(computationStartTime).toLocaleTimeString()}...`);
+                isRunning = true;
+                initializeTasks();
+                console.log(`[Coordinator] Attempting to assign initial tasks to ${workers.size} workers.`);
+                Array.from(workers.values()).forEach(workerData => assignTaskToAvailableWorker()); 
+                
+                if (taskQueue.length > 0) {
+                    logToDirector(`Not all tasks assigned initially. ${taskQueue.length} tasks remaining.`);
+                } else {
+                    logToDirector('All initial tasks assigned.');
+                }
+                break;
+            
+            case 'result':
+                const resultWorkerId = data.workerId;
+                const workerData = workers.get(resultWorkerId);
+
+                if (!workerData) {
+                    console.warn(`[Coordinator] Result from unknown worker ID: ${resultWorkerId}`);
+                    return;
+                }
+
+                workerData.isBusy = false;
+                const completedTask = workerData.assignedTask;
+                workerData.assignedTask = null;
+
+                primeCount = BigInt(data.count);
+                results[data.taskId] = primeCount;
+
+                workerData.stats.tasksCompleted++;
+                workerData.stats.primesFound += primeCount;
+                workerData.stats.lastTaskTime = Date.now();
+
+                const completedTotal = results.filter(r => r !== null).length;
+                console.log(`[Coordinator] Task ${data.taskId} completed by worker ${resultWorkerId}. Total completed: ${completedTotal}`);
+                logToDirector(`Worker ${resultWorkerId.substring(0, 8)}... completed task ${data.taskId} (${primeCount.toLocaleString()} primes).`);
+                updateDirectorProgress(data.taskId, primeCount, completedTotal);
+
+                updateDirectorWorkerInfo(resultWorkerId, { 
+                    status: 'Idle', 
+                    currentTask: null, 
+                    stats: workerData.stats,
+                    browserInfo: workerData.browserInfo
+                });
+
+                if (completedTotal === TOTAL_TASKS) {
+                    const totalPrimes = results.reduce((sum, count) => sum + count, on);
+                    notifyDirectorComplete(totalPrimes);
+                    isRunning = false;
+                    const computationEndTime = Date.now();
+                    const duration = (computationEndTime - computationStartTime) / 1000;
+                    logToDirector(`Computation finished in ${duration.toFixed(2)} seconds.`);
+                    console.log(`[Coordinator] ALL TASKS COMPLETE. Final Total: ${totalPrimes}. Duration: ${duration.toFixed(2)}s`);
+                } else {
+                    assignTaskToAvailableWorker();
+                }
+                break;
+
+            case 'error':
+                const errorWorkerId = data.workerId;
+                const errorWorkerData = workers.get(errorWorkerId);
+
+                if (!errorWorkerData) {
+                    console.warn(`[Coordinator] Error from unknown worker ID: ${errorWorkerId}`);
+                    return;
+                }
+
+                errorWorkerData.isBusy = false; 
+                const failedTask = errorWorkerData.assignedTask;
+                errorWorkerData.assignedTask = null;
+
+                console.log(`[Coordinator] Worker ${errorWorkerId} reported an error on task ${failedTask ? failedTask.taskId : 'unknown'}. Re-queuing.`);
+                logToDirector(`Worker ${errorWorkerId.substring(0, 8)}... crashed on task ${failedTask ? failedTask.taskId : 'unknown'}. Error: ${data.message}. Re-queuing...`);
+                
+                updateDirectorWorkerInfo(errorWorkerId, { 
+                    status: 'Error', 
+                    currentTask: null, 
+                    stats: errorWorkerData.stats,
+                    browserInfo: errorWorkerData.browserInfo
+                });
+
+                if (failedTask) {
+                    taskQueue.unshift(failedTask);
+                    assignTaskToAvailableWorker();
+                }
+                break;
+        }
+    });
+
+    ws.on('close', () => {
+        // Use ws.type to distinguish between director and worker disconnections
+        if (ws.type === 'director') {
+            console.log('Director disconnected.');
+            logToDirector('Director disconnected. No further updates will be sent.');
+            directorSocket = null;
+        } else if (ws.type === 'worker' && ws.workerId) {
+            const disconnectedWorkerId = ws.workerId;
+            const disconnectedWorkerData = workers.get(disconnectedWorkerId);
+            workers.delete(disconnectedWorkerId);
+            console.log(`Worker ${disconnectedWorkerId} disconnected. Total workers: ${workers.size}`);
+            logToDirector(`Worker ${disconnectedWorkerId.substring(0, 8)}... disconnected. Total workers: ${workers.size}`);
+
+            if (directorSocket && directorSocket.readyState === WebSocket.OPEN) {
+                directorSocket.send(JSON.stringify({ type: 'workerRemoved', workerId: disconnectedWorkerId }));
+            }
+
+            if (disconnectedWorkerData && disconnectedWorkerData.assignedTask) {
+                console.log(`Worker ${disconnectedWorkerId} was holding task ${disconnectedWorkerData.assignedTask.taskId}. Returning it to the queue.`);
+                logToDirector(`Worker ${disconnectedWorkerId.substring(0, 8)}... disconnected with task ${disconnectedWorkerData.assignedTask.taskId}. Re-queuing...`);
+                taskQueue.unshift(disconnectedWorkerData.assignedTask);
+                assignTaskToAvailableWorker();
+            }
+        }
+    });
+});
+
+
+
+
+
+
+/*
+// coordinator_server.js
+// This file is part of the Prime Distributed Project, which coordinates prime number calculations across multiple workers
+// using WebSockets. It manages task distribution, worker registration, and result aggregation.
+// The server listens for connections on port 8080 and expects workers to register themselves.
+
+
+// coordinator_server.js
+import { WebSocketServer } from 'ws';
+
+const wss = new WebSocketServer({ port: 8080});
+console.log('Coordinator server running on ws://0.0.0.0:8080');
+console.log('Ensure VS Code tunnel is forwarding local port 8080 to a public WSS URL.');
+
+const N = 400000000;
+const TOTAL_TASKS = 10;
+
+let directorSocket = null;
+const workers = new Set();
+const taskQueue = [];
+let results = [];
+let isRunning = false;
+
+function logToDirector(message) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'log', message }));
+    }
+}
+
+function updateDirectorProgress(taskId, count, totalCompleted) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'progress', taskId, count, totalCompleted }));
+    }
+}
+
+function notifyDirectorComplete(totalPrimes) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'complete', totalPrimes }));
+    }
+}
+
+function initializeTasks() {
+    taskQueue.length = 0;
+    results = new Array(TOTAL_TASKS).fill(null);
+    const chunkSize = Math.floor(N / TOTAL_TASKS);
+    for (let i = 0; i < TOTAL_TASKS; i++) {
+        const start = i * chunkSize + 1;
+        const effectiveStart = (i === 0 && start === 1) ? 2 : start; 
+        const end = (i === TOTAL_TASKS - 1) ? N : (i + 1) * chunkSize; 
+        taskQueue.push({ taskId: i, start: effectiveStart, end });
+    }
+    logToDirector(`Task queue created with ${taskQueue.length} tasks.`);
+    console.log(`[Coordinator] Task queue initialized: ${taskQueue.length} tasks.`); // DEBUG
+}
+
+function assignTaskToAvailableWorker() {
+    if (taskQueue.length === 0) {
+        console.log('[Coordinator] No tasks in queue to assign.'); // DEBUG
+        return;
+    }
+
+    let assignedCount = 0; // DEBUG
+    for (const worker of workers) {
+        if (!worker.isBusy) {
+            const task = taskQueue.shift();
+            if (task) {
+                worker.isBusy = true;
+                worker.assignedTask = task;
+                worker.send(JSON.stringify({ type: 'task', task }));
+                logToDirector(`Assigned task ${task.taskId} to a worker.`);
+                console.log(`[Coordinator] Assigned task ${task.taskId} to worker.`); // DEBUG
+                assignedCount++; // DEBUG
+            } else {
+                console.log('[Coordinator] Task queue became empty during assignment loop.'); // DEBUG
+                break; // No more tasks
+            }
+        } else {
+            console.log('[Coordinator] Worker is busy, skipping.'); // DEBUG
+        }
+    }
+    if (assignedCount === 0 && taskQueue.length > 0) { // DEBUG
+        console.log(`[Coordinator] No workers available to assign tasks. Workers count: ${workers.size}`); // DEBUG
+    }
+}
+
+wss.on('connection', ws => {
+    ws.on('message', message => {
+        const data = JSON.parse(message);
+        
+        switch (data.type) {
+            case 'registerDirector':
+                directorSocket = ws;
+                console.log('Director has connected.');
+                logToDirector('👑 You are the Director. Ready to start.');
+                break;
+
+            case 'registerWorker':
+                ws.isBusy = false;
+                workers.add(ws);
+                console.log(`Worker registered. Total workers: ${workers.size}`);
+                logToDirector(`A new worker connected. Total workers: ${workers.size}`);
+                // Only assign if computation is already running AND there are tasks
+                if (isRunning && taskQueue.length > 0) { 
+                    console.log(`[Coordinator] Worker registered while running, attempting to assign task.`); // DEBUG
+                    assignTaskToAvailableWorker();
+                } else if (isRunning && taskQueue.length === 0) { // DEBUG
+                    console.log(`[Coordinator] Worker registered, but no tasks left.`);
+                }
+                break;
+
+            case 'startComputation':
+                if (isRunning) {
+                    logToDirector('Computation is already running.');
+                    console.log('[Coordinator] Start computation requested, but already running.'); // DEBUG
+                    return;
+                }
+                console.log('Director started the computation.');
+                logToDirector('Starting new computation...'); // Added for clarity on Director UI
+                isRunning = true;
+                initializeTasks();
+                console.log(`[Coordinator] Attempting to assign initial tasks to ${workers.size} workers.`); // DEBUG
+                workers.forEach(worker => assignTaskToAvailableWorker());
+                // If there are still tasks in the queue after initial assignment, log it
+                if (taskQueue.length > 0) { // DEBUG
+                    logToDirector(`Not all tasks assigned initially. ${taskQueue.length} tasks remaining.`);
+                } else { // DEBUG
+                    logToDirector('All initial tasks assigned.');
+                }
+                break;
+            
+            case 'result':
+                ws.isBusy = false;
+                ws.assignedTask = null;
+                results[data.taskId] = data.count;
+                
+                const completed = results.filter(r => r !== null).length;
+                console.log(`[Coordinator] Task ${data.taskId} completed by worker. Total completed: ${completed}`); // DEBUG
+                updateDirectorProgress(data.taskId, data.count, completed);
+
+                if (completed === TOTAL_TASKS) {
+                    const totalPrimes = results.reduce((sum, count) => sum + count, 0);
+                    notifyDirectorComplete(totalPrimes);
+                    console.log(`[Coordinator] ALL TASKS COMPLETE. Final Total: ${totalPrimes}`); // DEBUG
+                    isRunning = false;
+                } else {
+                    assignTaskToAvailableWorker();
+                }
+                break;
+
+            case 'error':
+                ws.isBusy = false; 
+                const failedTask = ws.assignedTask;
+                ws.assignedTask = null;
+
+                if (failedTask && failedTask.taskId === data.taskId) {
+                    console.log(`[Coordinator] Worker reported an error on task ${failedTask.taskId}. Re-queuing.`); // DEBUG
+                    logToDirector(`Worker crashed on task ${failedTask.taskId}. Re-queuing...`);
+                    taskQueue.unshift(failedTask);
+                    assignTaskToAvailableWorker();
+                }
+                break;
+        }
+    });
+
+    ws.on('close', () => {
+        if (ws === directorSocket) {
+            console.log('Director disconnected.');
+            directorSocket = null;
+        } else {
+            workers.delete(ws);
+            console.log(`Worker disconnected. Total workers: ${workers.size}`);
+            logToDirector(`A worker disconnected. Total workers: ${workers.size}`);
+
+            if (ws.assignedTask) {
+                console.log(`Worker was holding task ${ws.assignedTask.taskId}. Returning it to the queue.`);
+                logToDirector(`A worker disconnected with task ${ws.assignedTask.taskId}. Re-queuing...`);
+                taskQueue.unshift(ws.assignedTask);
+                assignTaskToAvailableWorker();
+            }
+        }
+    });
+});
+
+
+// End of coordinator_server.js
+
+/*
+import { WebSocketServer } from 'ws';
+
+const wss = new WebSocketServer({ port: 8080 });
+console.log('Coordinator server running on ws://localhost:8080');
+
+// --- CONSTANTS ---
+const N = 1000000n;
+ // Using BigInt for large number support
+ //const N = 100_000_000_000n; 
+const TOTAL_TASKS = 10n;    // BigInt for calculations
+
+// --- STATE VARIABLES ---
+let directorSocket = null;
+const workers = new Map(); // Use a Map to store workers by a unique ID
+let nextWorkerId = 0;
+const taskQueue = [];
+let results = [];
+let isRunning = false;
+
+// --- HELPER FUNCTIONS ---
+
+function logToDirector(message) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'log', message }));
+    }
+}
+
+function updateDirectorProgress(taskId, count, totalCompleted, workerId, taskDuration) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'progress', taskId, count, totalCompleted, workerId, taskDuration }));
+    }
+}
+
+function notifyDirectorComplete(totalPrimes) {
+     if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'complete', totalPrimes }));
+    }
+}
+
+function initializeTasks() {
+    taskQueue.length = 0;
+    results = new Array(Number(TOTAL_TASKS)).fill(null);
+    const chunkSize = N / TOTAL_TASKS;
+    for (let i = 0n; i < TOTAL_TASKS; i++) {
+        const start = i * chunkSize + 1n;
+        const effectiveStart = (i === 0n && start === 1n) ? 2n : start;
+        const end = (i === TOTAL_TASKS - 1n) ? N : (i + 1n) * chunkSize;
+        taskQueue.push({ taskId: Number(i), start: start.toString(), end: end.toString() });
+    }
+    logToDirector(`Task queue created with ${taskQueue.length} tasks.`);
+}
+
+function assignTaskToAvailableWorker() {
+    if (taskQueue.length === 0) return;
+
+    // Use workers.values() for a Map
+    for (const worker of workers.values()) {
+        if (!worker.isBusy) {
+            const task = taskQueue.shift();
+            if (task) {
+                task.startTime = performance.now();
+                worker.isBusy = true;
+                worker.assignedTask = task;
+                worker.send(JSON.stringify({ type: 'task', task }));
+                logToDirector(`Assigned task ${task.taskId} to worker #${worker.id}`);
+            }
+        }
+    }
+}
+
+// --- MAIN SERVER LOGIC ---
+
+wss.on('connection', ws => {
+    const workerId = nextWorkerId++; // Assign a unique ID to each connection
+    
+    ws.on('message', message => {
+        const data = JSON.parse(message);
+        
+        switch (data.type) {
+            case 'registerDirector':
+                directorSocket = ws;
+                console.log('Director has connected.');
+                logToDirector('👑 You are the Director. Ready to start.');
+                break;
+
+            case 'registerWorker':
+                ws.isBusy = false;
+                ws.info = data.info; // Store the worker's system info
+                ws.id = workerId;
+                workers.set(workerId, ws);
+
+                console.log(`Worker #${workerId} registered. Total workers: ${workers.size}`);
+                if (directorSocket) {
+                    directorSocket.send(JSON.stringify({ type: 'workerConnected', workerId, info: ws.info }));
+                }
+                
+                if (isRunning) assignTaskToAvailableWorker();
+                break;
+
+            case 'startComputation':
+                if (isRunning) {
+                    logToDirector('Computation is already running.');
+                    return;
+                }
+                console.log('Director started the computation.');
+                isRunning = true;
+                initializeTasks();
+                workers.forEach(worker => assignTaskToAvailableWorker());
+                break;
+            
+            case 'result':
+                const workerForResult = workers.get(ws.id);
+                if (!workerForResult) return;
+
+                workerForResult.isBusy = false;
+                const finishedTask = workerForResult.assignedTask;
+                workerForResult.assignedTask = null;
+                results[data.taskId] = data.count;
+                
+                const completed = results.filter(r => r !== null).length;
+                const taskDuration = performance.now() - finishedTask.startTime;
+                updateDirectorProgress(data.taskId, data.count, completed, ws.id, taskDuration);
+
+                if (completed === Number(TOTAL_TASKS)) {
+                    const totalPrimes = results.reduce((sum, countStr) => sum + BigInt(countStr), 0n);
+                    notifyDirectorComplete(totalPrimes.toString());
+                    isRunning = false;
+                } else {
+                    assignTaskToAvailableWorker();
+                }
+                break;
+
+            case 'error':
+                const workerForError = workers.get(ws.id);
+                if (!workerForError) return;
+
+                workerForError.isBusy = false; 
+                const failedTask = workerForError.assignedTask;
+                workerForError.assignedTask = null;
+
+                if (failedTask && failedTask.taskId === data.taskId) {
+                    console.log(`Worker #${ws.id} reported an error on task ${failedTask.taskId}. Returning it to the queue.`);
+                    logToDirector(`Worker #${ws.id} crashed on task ${failedTask.taskId}. Re-queuing...`);
+                    taskQueue.unshift(failedTask);
+                    assignTaskToAvailableWorker();
+                }
+                break;
+        }
+    });
+
+    ws.on('close', () => {
+        if (ws === directorSocket) {
+            console.log('Director disconnected.');
+            directorSocket = null;
+        } else {
+            const worker = workers.get(workerId);
+            if (worker) {
+                workers.delete(workerId);
+                console.log(`Worker #${workerId} disconnected. Total workers: ${workers.size}`);
+                if (directorSocket) {
+                    directorSocket.send(JSON.stringify({ type: 'workerDisconnected', workerId }));
+                }
+
+                if (worker.assignedTask) {
+                    console.log(`Worker was holding task ${worker.assignedTask.taskId}. Returning it to the queue.`);
+                    logToDirector(`A worker disconnected with task ${worker.assignedTask.taskId}. Re-queuing...`);
+                    taskQueue.unshift(worker.assignedTask);
+                    assignTaskToAvailableWorker();
+                }
+            }
+        }
+    });
+});
+
+
+
+
+
+
+
+/*
+import { WebSocketServer } from 'ws';
+
+const wss = new WebSocketServer({ port: 8080 });
+console.log('Coordinator server running on ws://localhost:8080');
+
+// Use your original large number, with 'n' at the end to make it a BigInt
+const N = 100_000_000_000n; 
+const TOTAL_TASKS = 10n; // Also a BigInt
+
+let directorSocket = null;
+const workers = new Set();
+const taskQueue = [];
+let results = [];
+let isRunning = false;
+
+
+function logToDirector(message) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'log', message }));
+    }
+}
+
+function updateDirectorProgress(taskId, count, totalCompleted) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'progress', taskId, count, totalCompleted }));
+    }
+}
+
+function notifyDirectorComplete(totalPrimes) {
+     if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'complete', totalPrimes }));
+    }
+}
+
+
+function initializeTasks() {
+    taskQueue.length = 0;
+    results = new Array(Number(TOTAL_TASKS)).fill(null); // Array length must be a standard number
+    
+    // All calculations must now use BigInt math
+    const chunkSize = N / TOTAL_TASKS;
+    for (let i = 0n; i < TOTAL_TASKS; i++) { // Loop with BigInt
+        const start = i * chunkSize + 1n;
+        const effectiveStart = (i === 0n && start === 1n) ? 2n : start;
+        const end = (i === TOTAL_TASKS - 1n) ? N : (i + 1n) * chunkSize;
+        // Note: BigInts are converted to strings when JSONified, which is fine.
+        taskQueue.push({ taskId: Number(i), start: start.toString(), end: end.toString() });
+    }
+    logToDirector(`Task queue created with ${taskQueue.length} tasks.`);
+}
+
+function assignTaskToAvailableWorker() {
+    if (taskQueue.length === 0) return;
+
+    for (const worker of workers) {
+        if (!worker.isBusy) {
+            const task = taskQueue.shift();
+            if (task) {
+                worker.isBusy = true;
+                worker.assignedTask = task;
+                worker.send(JSON.stringify({ type: 'task', task }));
+                logToDirector(`Assigned task ${task.taskId} to a worker.`);
+            }
+            break; 
+        }
+    }
+}
+
+wss.on('connection', ws => {
+    ws.on('message', message => {
+        const data = JSON.parse(message);
+        
+        switch (data.type) {
+            case 'registerDirector':
+                directorSocket = ws;
+                console.log('Director has connected.');
+                logToDirector('👑 You are the Director. Ready to start.');
+                break;
+
+            case 'registerWorker':
+                ws.isBusy = false;
+                workers.add(ws);
+                console.log(`Worker registered. Total workers: ${workers.size}`);
+                logToDirector(`A new worker connected. Total workers: ${workers.size}`);
+                if (isRunning) assignTaskToAvailableWorker();
+                break;
+
+            case 'startComputation':
+                if (isRunning) {
+                    logToDirector('Computation is already running.');
+                    return;
+                }
+                console.log('Director started the computation.');
+                isRunning = true;
+                initializeTasks();
+                workers.forEach(worker => assignTaskToAvailableWorker());
+                break;
+            
+            case 'result':
+                ws.isBusy = false;
+                ws.assignedTask = null;
+                results[data.taskId] = data.count; // The count is a string
+                
+                const completed = results.filter(r => r !== null).length;
+                updateDirectorProgress(data.taskId, data.count, completed);
+
+                if (completed === Number(TOTAL_TASKS)) {
+                    // Use BigInt for the final sum
+                    const totalPrimes = results.reduce((sum, countStr) => sum + BigInt(countStr), 0n);
+                    notifyDirectorComplete(totalPrimes.toString()); // Convert final result to string
+                    isRunning = false;
+                } else {
+                    assignTaskToAvailableWorker();
+                }
+                break;
+
+            case 'error':
+                ws.isBusy = false; 
+                const failedTask = ws.assignedTask;
+                ws.assignedTask = null;
+
+                if (failedTask && failedTask.taskId === data.taskId) {
+                    console.log(`Worker reported an error on task ${failedTask.taskId}. Returning it to the queue.`);
+                    logToDirector(`Worker crashed on task ${failedTask.taskId}. Re-queuing...`);
+                    taskQueue.unshift(failedTask);
+                    assignTaskToAvailableWorker();
+                }
+                break;
+        }
+    });
+
+    ws.on('close', () => {
+        if (ws === directorSocket) {
+            console.log('Director disconnected.');
+            directorSocket = null;
+        } else {
+            workers.delete(ws);
+            console.log(`Worker disconnected. Total workers: ${workers.size}`);
+            logToDirector(`A worker disconnected. Total workers: ${workers.size}`);
+
+            if (ws.assignedTask) {
+                console.log(`Worker was holding task ${ws.assignedTask.taskId}. Returning it to the queue.`);
+                logToDirector(`A worker disconnected with task ${ws.assignedTask.taskId}. Re-queuing...`);
+                taskQueue.unshift(ws.assignedTask);
+                assignTaskToAvailableWorker();
+            }
+        }
+    });
+});
+
+
+
+
+/*
+
+import { WebSocketServer } from 'ws';
+// Explicitly bind to '0.0.0.0' for clarity and consistency
+//const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
+const wss = new WebSocketServer({ port: 8080 });
+console.log('Coordinator server running on ws://localhost:8080');
+
+const N = 400000000; // Using 100M for a more substantial test
+const TOTAL_TASKS = 10;
+
+let directorSocket = null;
+const workers = new Set();
+const taskQueue = [];
+let results = [];
+let isRunning = false;
+
+function logToDirector(message) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'log', message }));
+    }
+}
+
+function updateDirectorProgress(taskId, count, totalCompleted) {
+    if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'progress', taskId, count, totalCompleted }));
+    }
+}
+
+function notifyDirectorComplete(totalPrimes) {
+     if (directorSocket && directorSocket.readyState === directorSocket.OPEN) {
+        directorSocket.send(JSON.stringify({ type: 'complete', totalPrimes }));
+    }
+}
+
+
+function initializeTasks() {
+    taskQueue.length = 0;
+    results = new Array(TOTAL_TASKS).fill(null);
+    const chunkSize = Math.floor(N / TOTAL_TASKS);
+    for (let i = 0; i < TOTAL_TASKS; i++) {
+        const start = i * chunkSize + 1;
+        const effectiveStart = (i === 0 && start === 1) ? 2 : start;
+        const end = (i === TOTAL_TASKS - 1) ? N : (i + 1) * chunkSize;
+        taskQueue.push({ taskId: i, start: effectiveStart, end });
+    }
+    logToDirector(`Task queue created with ${taskQueue.length} tasks.`);
+}
+
+function assignTaskToAvailableWorker() {
+    if (taskQueue.length === 0) return;
+
+    for (const worker of workers) {
+        if (!worker.isBusy) {
+            const task = taskQueue.shift();
+            if (task) {
+                worker.isBusy = true;
+                worker.assignedTask = task;
+                worker.send(JSON.stringify({ type: 'task', task }));
+                logToDirector(`Assigned task ${task.taskId} to a worker.`);
+            }
+            break; 
+        }
+    }
+}
+
+wss.on('connection', ws => {
+    ws.on('message', message => {
+        const data = JSON.parse(message);
+        
+        switch (data.type) {
+            case 'registerDirector':
+                directorSocket = ws;
+                console.log('Director has connected.');
+                logToDirector('👑 You are the Director. Ready to start.');
+                break;
+
+            case 'registerWorker':
+                ws.isBusy = false;
+                workers.add(ws);
+                console.log(`Worker registered. Total workers: ${workers.size}`);
+                logToDirector(`A new worker connected. Total workers: ${workers.size}`);
+                if (isRunning) assignTaskToAvailableWorker();
+                break;
+
+            case 'startComputation':
+                if (isRunning) {
+                    logToDirector('Computation is already running.');
+                    return;
+                }
+                console.log('Director started the computation.');
+                isRunning = true;
+                initializeTasks();
+                workers.forEach(worker => assignTaskToAvailableWorker());
+                break;
+            
+            case 'result':
+                ws.isBusy = false;
+                ws.assignedTask = null;
+                results[data.taskId] = data.count;
+                
+                const completed = results.filter(r => r !== null).length;
+                updateDirectorProgress(data.taskId, data.count, completed);
+
+                if (completed === TOTAL_TASKS) {
+                    const totalPrimes = results.reduce((sum, count) => sum + count, 0);
+                    notifyDirectorComplete(totalPrimes);
+                    isRunning = false;
+                } else {
+                    assignTaskToAvailableWorker();
+                }
+                break;
+
+            case 'error':
+                ws.isBusy = false; 
+                const failedTask = ws.assignedTask;
+                ws.assignedTask = null;
+
+                if (failedTask && failedTask.taskId === data.taskId) {
+                    console.log(`Worker reported an error on task ${failedTask.taskId}. Returning it to the queue.`);
+                    logToDirector(`Worker crashed on task ${failedTask.taskId}. Re-queuing...`);
+                    taskQueue.unshift(failedTask);
+                    assignTaskToAvailableWorker();
+                }
+                break;
+        }
+    });
+
+    ws.on('close', () => {
+        if (ws === directorSocket) {
+            console.log('Director disconnected.');
+            directorSocket = null;
+        } else {
+            workers.delete(ws);
+            console.log(`Worker disconnected. Total workers: ${workers.size}`);
+            logToDirector(`A worker disconnected. Total workers: ${workers.size}`);
+
+            if (ws.assignedTask) {
+                console.log(`Worker was holding task ${ws.assignedTask.taskId}. Returning it to the queue.`);
+                logToDirector(`A worker disconnected with task ${ws.assignedTask.taskId}. Re-queuing...`);
+                taskQueue.unshift(ws.assignedTask);
+                assignTaskToAvailableWorker();
+            }
+        }
+    });
+});
+*/
