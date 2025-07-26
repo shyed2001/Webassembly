@@ -83,7 +83,7 @@
 
         // !!! IMPORTANT: REPLACE 'YOUR_LOCAL_IP_ADDRESS' WITH YOUR ACTUAL WINDOWS MACHINE'S IP !!!
         // Example: 'ws://192.168.1.106:8080'
-        const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.106:8080'; // <--- REPLACE THIS LINE!
+        const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.105:8080'; // <--- REPLACE THIS LINE!
 
         let workerSocket;
 
@@ -140,37 +140,32 @@
                         wasmModule = await wasmFactory();
                     }
                     
-                    const functionToCall = `worker_func_${task.taskId}`;
+                    // --- FIX STARTS HERE ---
+                    // Now calling the single generic C++ function: 'count_primes_in_range'
+                    const functionToCall = 'count_primes_in_range'; // <--- THIS IS THE CRITICAL CHANGE
+                    // --- FIX ENDS HERE ---
                     
                     statusDiv.textContent = `Executing C++ for task #${task.taskId}...`;
                     
-                    // Convert task.start and task.end to BigInts before passing to WASM
                     const startBigInt = BigInt(task.start);
                     const endBigInt = BigInt(task.end);
 
-                    // Call the WASM function, specifying 'bigint' for input types
-                    // and expecting 'bigint' for the return type if primeCount can exceed Number.MAX_SAFE_INTEGER
-                    // If primeCount is always within safe integer limits, 'number' is fine.
-                    // Given N=400M, prime counts per task can be large, so expecting 'bigint' return.
                     const primeCountBigInt = wasmModule.ccall(
                         functionToCall,
-                        'bigint', // Expecting BigInt return type from WASM
-                        ['bigint', 'bigint'], // Input types to WASM
-                        [startBigInt, endBigInt] // Pass the BigInt values
+                        'bigint', 
+                        ['bigint', 'bigint'], 
+                        [startBigInt, endBigInt] 
                     );
                     
-                    // Send result along with worker ID
-                    // Convert BigInt primeCount to a string for JSON serialization
                     workerSocket.send(JSON.stringify({ 
                         type: 'result', 
                         workerId: myWorkerId, 
                         taskId: task.taskId, 
-                        count: primeCountBigInt.toString() // Convert to string for JSON
+                        count: primeCountBigInt.toString() 
                     }));
                     
-                    // Update my own stats (using BigInt arithmetic)
                     myTasksCompleted++;
-                    myPrimesFound += primeCountBigInt; // Add BigInt to BigInt
+                    myPrimesFound += primeCountBigInt; 
                     myTasksCompletedSpan.textContent = myTasksCompleted;
                     myPrimesFoundSpan.textContent = myPrimesFound.toLocaleString();
 
@@ -180,7 +175,6 @@
                     console.error(`Error executing task ${task.taskId} on worker ${myWorkerId}:`, error);
                     statusDiv.textContent = `❌ Error on task #${task.taskId}. Reporting to server.`;
                     
-                    // Report error along with worker ID
                     workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: task.taskId, message: error.message }));
                 }
             };
@@ -199,6 +193,3 @@
     </script>
 </body>
 </html>
-
-
-

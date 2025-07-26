@@ -123,7 +123,7 @@
         <button id="start-btn" class="btn btn-primary mt-4">Start Computation</button>
         
         <div class="mt-6 w-full">
-            <p class="font-bold mb-2">Tasks Completed: <span id="tasks-completed">0 / 10</span></p>
+            <p class="font-bold mb-2">Tasks Completed: <span id="tasks-completed">0 / 25</span></p>
             <p class="font-bold mb-2">Running Total Primes: <span id="running-total">0</span></p>
             <div id="progress-container" class="progress-container">
                 <!-- Progress bars will be inserted here by JS -->
@@ -168,7 +168,7 @@
         const connectedWorkersCountSpan = document.getElementById('connected-workers-count');
         const workersTableBody = document.getElementById('workers-table').getElementsByTagName('tbody')[0];
 
-        const TOTAL_TASKS = 10;
+        const TOTAL_TASKS = 512;
         // Initialize runningTotal as a BigInt for large sums
         let runningTotal = 0n; 
         const workerStats = new Map(); // Store worker stats for the table
@@ -180,7 +180,7 @@
 
         // !!! IMPORTANT: REPLACE 'YOUR_LOCAL_IP_ADDRESS' WITH YOUR ACTUAL WINDOWS MACHINE'S IP !!!
         // Example: 'ws://192.168.1.106:8080'
-        const COORDINATOR_WS_URL = 'ws://192.168.1.106:8080'; // <--- REPLACE THIS LINE!
+        const COORDINATOR_WS_URL = 'ws://192.168.1.105:8080'; // <--- REPLACE THIS LINE!
 
         let socket; // Declare socket here so it can be re-initialized if needed
         let reconnectAttempts = 0;

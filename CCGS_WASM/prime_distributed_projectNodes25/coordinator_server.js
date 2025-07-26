@@ -3,12 +3,12 @@ import { WebSocketServer } from 'ws';
 
 // Explicitly bind to '0.0.0.0' to accept connections from all network interfaces,
 // including those coming through the local network or any tunnels.
-const wss = new WebSocketServer({ port: 8080});
+const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
 console.log('Coordinator server running on ws://0.0.0.0:8080');
 console.log('Ensure Windows Firewall allows connections on port 8080.'); // Reminder for local IP setup
 
-const N = 400000000; // Total range for prime computation
-const TOTAL_TASKS = 10; // Number of tasks to divide the computation into
+const N = 512000000; // Total range for prime computation
+const TOTAL_TASKS = 512; // <--- Set to 25 to match the director.html provided
 
 let directorSocket = null; // Stores the WebSocket connection for the Director client
 // Using a Map to store worker objects, keyed by their unique workerId
@@ -48,11 +48,10 @@ function updateDirectorProgress(taskId, count, totalCompleted) {
  */
 function updateDirectorWorkerInfo(workerId, workerInfo) {
     if (directorSocket && directorSocket.readyState === WebSocket.OPEN) { // Ensure directorSocket is open
-        // Ensure primesFound is converted to string for JSON serialization
-        const infoToSend = { ...workerInfo }; // Create a copy to modify
-        if (infoToSend.stats && typeof infoToSend.stats.primesFound === 'bigint') {
-            infoToSend.stats.primesFound = infoToSend.stats.primesFound.toString();
-        }
+        // Create a deep copy to ensure BigInts are converted to strings for JSON serialization
+        const infoToSend = JSON.parse(JSON.stringify(workerInfo, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value // Custom replacer for BigInt
+        ));
         directorSocket.send(JSON.stringify({ type: 'workerUpdate', workerId, workerInfo: infoToSend }));
     } else {
         console.warn(`[Coordinator] Cannot send workerUpdate for ${workerId}: Director not connected or socket closed.`);
@@ -74,17 +73,14 @@ function notifyDirectorComplete(totalPrimes) {
  * Initializes the task queue by dividing the total computation range (N)
  * into TOTAL_TASKS chunks.
  */
-function initializeTasks() {
+function initializeTasks() { // No longer accepts dynamicTotalTasks
     taskQueue.length = 0;
-    // results array will store BigInts
-    results = new Array(TOTAL_TASKS).fill(null); 
-    const chunkSize = Math.floor(N / TOTAL_TASKS);
+    results = new Array(TOTAL_TASKS).fill(null); // Use fixed TOTAL_TASKS
+    const chunkSize = Math.floor(N / TOTAL_TASKS); // Use fixed TOTAL_TASKS
 
-    for (let i = 0; i < TOTAL_TASKS; i++) {
+    for (let i = 0; i < TOTAL_TASKS; i++) { // Use fixed TOTAL_TASKS
         const start = i * chunkSize + 1;
-        // Adjust start for task 0 to avoid checking 1 (not prime)
         const effectiveStart = (i === 0 && start === 1) ? 2 : start; 
-        // Ensure the last task covers up to N
         const end = (i === TOTAL_TASKS - 1) ? N : (i + 1) * chunkSize; 
         taskQueue.push({ taskId: i, start: effectiveStart, end });
     }
@@ -92,9 +88,6 @@ function initializeTasks() {
     console.log(`[Coordinator] Task queue initialized: ${taskQueue.length} tasks.`);
 }
 
-/**
- * Assigns a task from the queue to an available (not busy) worker.
- */
 function assignTaskToAvailableWorker() {
     if (taskQueue.length === 0) {
         console.log('[Coordinator] No tasks in queue to assign.');
@@ -124,14 +117,12 @@ function assignTaskToAvailableWorker() {
             }
         }
     }
-    // If no workers are available and tasks remain
     if (taskQueue.length > 0 && Array.from(workers.values()).every(w => w.isBusy)) {
         console.log(`[Coordinator] All workers are busy. ${taskQueue.length} tasks still in queue.`);
         logToDirector(`All workers busy. ${taskQueue.length} tasks remaining.`);
     }
 }
 
-// Event listener for new WebSocket connections to the server
 wss.on('connection', ws => {
     ws.type = 'unknown'; 
 
@@ -187,7 +178,6 @@ wss.on('connection', ws => {
                         ws: ws, 
                         isBusy: false, 
                         assignedTask: null, 
-                        // Initialize primesFound as BigInt 0n
                         stats: { tasksCompleted: 0, primesFound: 0n, lastTaskTime: null }, 
                         browserInfo: data.browserInfo || 'Unknown Browser/OS' 
                     });
@@ -214,16 +204,17 @@ wss.on('connection', ws => {
                 break;
 
             case 'startComputation':
+                // No longer expects totalTasks from the Director, uses fixed TOTAL_TASKS
                 if (isRunning) {
                     logToDirector('Computation is already running.');
                     console.log('[Coordinator] Start computation requested, but already running.');
                     return;
                 }
                 computationStartTime = Date.now();
-                console.log('Director started the computation.');
-                logToDirector(`Starting new computation at ${new Date(computationStartTime).toLocaleTimeString()}...`);
+                console.log(`Director started the computation with ${TOTAL_TASKS} tasks.`); // Use fixed TOTAL_TASKS
+                logToDirector(`Starting new computation with ${TOTAL_TASKS} tasks at ${new Date(computationStartTime).toLocaleTimeString()}...`); // Use fixed TOTAL_TASKS
                 isRunning = true;
-                initializeTasks();
+                initializeTasks(); // No longer pass dynamicTotalTasks
                 console.log(`[Coordinator] Attempting to assign initial tasks to ${workers.size} workers.`);
                 Array.from(workers.values()).forEach(workerData => assignTaskToAvailableWorker()); 
                 
@@ -247,11 +238,9 @@ wss.on('connection', ws => {
                 const completedTask = workerData.assignedTask;
                 workerData.assignedTask = null;
 
-                // Convert received count string back to BigInt
                 const primeCount = BigInt(data.count); 
-                results[data.taskId] = primeCount; // Store the result (as BigInt)
+                results[data.taskId] = primeCount;
 
-                // Update worker's stats (BigInt addition)
                 workerData.stats.tasksCompleted++;
                 workerData.stats.primesFound += primeCount; 
                 workerData.stats.lastTaskTime = Date.now();
@@ -259,7 +248,7 @@ wss.on('connection', ws => {
                 const completedTotal = results.filter(r => r !== null).length;
                 console.log(`[Coordinator] Task ${data.taskId} completed by worker ${resultWorkerId}. Total completed: ${completedTotal}`);
                 logToDirector(`Worker ${resultWorkerId.substring(0, 8)}... completed task ${data.taskId} (${primeCount.toLocaleString()} primes).`);
-                updateDirectorProgress(data.taskId, primeCount, completedTotal); // primeCount is BigInt here
+                updateDirectorProgress(data.taskId, primeCount, completedTotal);
 
                 updateDirectorWorkerInfo(resultWorkerId, { 
                     status: 'Idle', 
@@ -268,8 +257,7 @@ wss.on('connection', ws => {
                     browserInfo: workerData.browserInfo
                 });
 
-                if (completedTotal === TOTAL_TASKS) {
-                    // Sum results (which are BigInts) using 0n as initial value for BigInt sum
+                if (completedTotal === TOTAL_TASKS) { // Use fixed TOTAL_TASKS for completion check
                     const totalPrimes = results.reduce((sum, count) => sum + count, 0n); 
                     notifyDirectorComplete(totalPrimes);
                     isRunning = false;
@@ -314,7 +302,7 @@ wss.on('connection', ws => {
     });
 
     ws.on('close', () => {
-        const disconnectedWorkerId = ws.workerId; // Get workerId directly if available
+        const disconnectedWorkerId = ws.workerId;
 
         if (ws.type === 'director') {
             console.log('Director disconnected.');
@@ -339,3 +327,51 @@ wss.on('connection', ws => {
         }
     });
 });
+
+// 
+/** * Starts the WebSocket server and initializes the task queue.
+ 
+---
+
+### 3. `worker.html` (No Changes Needed)
+
+Your `worker.html` file from the previous turn **does not need any changes** for this dynamic task count feature. It simply receives `start` and `end` values for its task, regardless of how many total tasks there are.
+
+---
+
+### Revised Step-by-Step Instructions
+
+1.  **Save Files:**
+    * Replace your `coordinator_server.js` content with the **Updated Node.js Coordinator Server (Dynamic Tasks)** code above.
+    * Replace your `director.html` content with the **Updated Director Control Panel (Dynamic Tasks)** code above.
+    * Your `worker.html` should be the one from the previous turn (no changes needed).
+    * Ensure `prime_library.js` and `prime_library.wasm` are in the same directory.
+
+2.  **Find Your Windows Machine's Current Local IP Address:** (If you haven't already, run `ipconfig` and get your IPv4 Address).
+
+3.  **Update `director.html` with Your Local IP Address:** (As before, replace `192.168.1.106` with your actual IP in `director.html`'s `COORDINATOR_WS_URL`).
+
+4.  **Configure Windows Firewall:** (Ensure TCP ports 8080 and 8008 are allowed inbound, for Domain, Private, and Public profiles).
+
+5.  **Perform a Clean Restart:**
+    * **Close ALL browser tabs** related to `director.html` and `worker.html`.
+    * **Stop your `python -m http.server`** (Ctrl+C).
+    * **Stop your `node coordinator_server.js`** (Ctrl+C).
+    * **Start `node coordinator_server.js`** again.
+    * **Start `python -m http.server 8008 --bind 0.0.0.0`** again.
+
+6.  **Access the Application in Your Browser:**
+    * **For the Director:** Open your web browser and go to:
+        `http://YOUR_LOCAL_IP_ADDRESS:8008/director.html`
+    * **For Workers:** Open **new tabs or separate devices** and go to:
+        `http://YOUR_LOCAL_IP_ADDRESS:8008/worker.html`
+
+7.  **Test the Dynamic Task Count:**
+    * On the `director.html` page, you will now see an input field for "Total Tasks".
+    * Change the value in the input field (e.g., to `20`, `50`, or `100`).
+    * Click the "Start Computation" button.
+    * Observe the Director Log and the "Tasks Completed: X / Y" display to confirm it updates with your chosen number of tasks.
+    * The progress bars will also be created based on this new number.
+
+This update makes your distributed computation system much more flexible!
+*/
