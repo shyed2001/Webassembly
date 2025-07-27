@@ -25,7 +25,7 @@ const log = (message) => {
 // https://xn05c0cs-8080.asse.devtunnels.ms/
 // const socket = new WebSocket('ws://xn05c0cs-8080.asse.devtunnels.ms:8080');
 // Remember to use your actual IP address here if testing on other devices
-const socket = new WebSocket('ws://192.168.1.112:8080');
+const socket = new WebSocket('ws://192.168.1.100:8080');
 
 socket.onopen = () => {
     log('✅ Connected. Registering as Director...');

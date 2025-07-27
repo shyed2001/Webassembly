@@ -57,7 +57,6 @@
 
     <h1 class="header">Distributed Prime Computation - Worker</h1>
 
-    <!-- Worker Section -->
     <div class="container flex flex-col items-center mt-8">
         <h2 class="section-title w-full text-center">Worker Status</h2>
         <div id="worker-id-display" class="text-lg font-bold mt-2">Worker ID: <span id="my-worker-id">N/A</span></div>
@@ -68,7 +67,6 @@
         </div>
     </div>
 
-    <!-- Worker Client Script -->
     <script type="module">
         import wasmFactory from './prime_library.js'; // Ensure this path is correct relative to worker.html
         const statusDiv = document.getElementById('status');
@@ -80,15 +78,18 @@
         let myWorkerId = null;
         let myTasksCompleted = 0;
         let myPrimesFound = 0n; // Initialize as BigInt for large prime counts
+        let isConnected = false;
+        let idleTimer = null;
+
 
         // !!! IMPORTANT: REPLACE 'YOUR_LOCAL_IP_ADDRESS' WITH YOUR ACTUAL WINDOWS MACHINE'S IP !!!
         // Example: 'ws://192.168.1.106:8080'
-        const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.112:8080'; // <--- REPLACE THIS LINE!
+        const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.100:8080'; // <--- REPLACE THIS LINE!
 
         let workerSocket;
 
         function generateWorkerId() {
-            return 'worker-' + Math.random().toString(36).substring(2, 11);
+            return 'worker-' + Date.now().toString(36) + Math.random().toString(36).substring(2);
         }
 
         function getBrowserInfo() {
@@ -113,21 +114,23 @@
         }
 
         function connectWorkerSocket() {
-            if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
-                workerSocket.close();
+            if (myWorkerId === null) {
+                myWorkerId = generateWorkerId();
+                myWorkerIdSpan.textContent = myWorkerId.substring(0, 12) + '...';
             }
+
             statusDiv.textContent = 'Connecting to coordinator...';
-            myWorkerId = generateWorkerId();
-            myWorkerIdSpan.textContent = myWorkerId;
-            
             workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
 
             workerSocket.onopen = () => {
+                isConnected = true;
                 statusDiv.textContent = '✅ Connected. Awaiting tasks.';
                 workerSocket.send(JSON.stringify({ type: 'registerWorker', workerId: myWorkerId, browserInfo: getBrowserInfo() }));
+                resetIdleTimer();
             };
 
             workerSocket.onmessage = async (event) => {
+                clearTimeout(idleTimer); // A task arrived, so we are not idle
                 const data = JSON.parse(event.data);
                 if (data.type !== 'task') return;
 
@@ -140,10 +143,7 @@
                         wasmModule = await wasmFactory();
                     }
                     
-                    // --- FIX STARTS HERE ---
-                    // Now calling the single generic C++ function: 'count_primes_in_range'
-                    const functionToCall = 'count_primes_in_range'; // <--- THIS IS THE CRITICAL CHANGE
-                    // --- FIX ENDS HERE ---
+                    const functionToCall = 'count_primes_in_range';
                     
                     statusDiv.textContent = `Executing C++ for task #${task.taskId}...`;
                     
@@ -176,17 +176,32 @@
                     statusDiv.textContent = `❌ Error on task #${task.taskId}. Reporting to server.`;
                     
                     workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: task.taskId, message: error.message }));
+                } finally {
+                     resetIdleTimer(); // Reset idle timer after task completion/error
                 }
             };
 
             workerSocket.onclose = () => {
-                statusDiv.textContent = '❌ Disconnected from coordinator. Please refresh the page to reconnect.';
+                isConnected = false;
+                clearTimeout(idleTimer);
+                statusDiv.textContent = '❌ Disconnected. Reconnecting in 5 seconds...';
+                setTimeout(connectWorkerSocket, 5000);
             };
 
             workerSocket.onerror = (error) => {
                 console.error('Worker WebSocket Error:', error);
-                statusDiv.textContent = '❌ Worker WebSocket error. Check console for details.';
+                workerSocket.close(); // This will trigger the onclose event for reconnection
             };
+        }
+
+        // *** NEW: Idle Timer Logic ***
+        function resetIdleTimer() {
+            clearTimeout(idleTimer);
+            // After 5 minutes of inactivity, refresh the page to clear memory
+            idleTimer = setTimeout(() => {
+                statusDiv.textContent = 'Idle for too long. Refreshing to clear memory...';
+                location.reload();
+            }, 300000); // 5 minutes
         }
 
         connectWorkerSocket();
