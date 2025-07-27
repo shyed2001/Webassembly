@@ -1,0 +1,273 @@
+<script>
+    // Object to hold references to all the UI elements we need to interact with.
+    // This makes the code cleaner and easier to read.
+    const ui = {
+        startBtn: document.getElementById('start-btn'),
+        resumeBtn: document.getElementById('resume-btn'),
+        pauseBtn: document.getElementById('pause-btn'),
+        stopBtn: document.getElementById('stop-btn'),
+        logDiv: document.getElementById('log'),
+        progressContainer: document.getElementById('progress-container'),
+        tasksCompletedSpan: document.getElementById('tasks-completed'),
+        runningTotalSpan: document.getElementById('running-total'),
+        nValueSpan: document.getElementById('n-value'),
+        connectedWorkersCountSpan: document.getElementById('connected-workers-count'),
+        computationStatusSpan: document.getElementById('computation-status'),
+        workersTableBody: document.querySelector('#workers-table tbody')
+    };
+
+    // Global state object to store the application's current state.
+    let state = {
+        totalTasks: 0,
+        nValue: 0,
+        isRunning: false,
+        workerStats: new Map() // Using a Map to easily manage worker data by their unique ID.
+    };
+    let socket; // Variable to hold the WebSocket connection.
+
+    // Dynamically create the WebSocket URL. It uses the same host as the one serving the HTML page.
+    // This makes the application portable and not dependent on a hardcoded IP address.
+    const COORDINATOR_WS_URL = `ws://${window.location.host}`;
+
+    // A helper function to append messages to the log area on the UI.
+    const log = (message) => {
+        ui.logDiv.textContent += message + '\n';
+        // Automatically scroll to the bottom of the log.
+        ui.logDiv.scrollTop = ui.logDiv.scrollHeight;
+    };
+
+    // Function to update or create a row in the worker table.
+    function updateWorkerRow(id, info) {
+        const rowId = `worker-row-${id}`;
+        let row = document.getElementById(rowId);
+        // If the row doesn't exist, create it.
+        if (!row) {
+            row = ui.workersTableBody.insertRow();
+            row.id = rowId;
+            // Create 10 cells for the new row.
+            for(let i = 0; i < 10; i++) row.insertCell();
+        }
+        // Set the appropriate CSS class for the status based on the worker's state.
+        const statusClass = info.status === 'Idle' ? 'text-green-500' : info.status === 'Busy' ? 'text-blue-500' : 'text-red-500';
+        
+        // Populate the cells with the worker's information.
+        row.cells[0].textContent = id;
+        row.cells[1].textContent = info.ipAddress || 'N/A';
+        row.cells[2].innerHTML = `<span class="${statusClass}">${info.status || 'N/A'}</span>`;
+        row.cells[3].textContent = info.currentTask !== null ? `Task ${info.currentTask}` : 'N/A';
+        row.cells[4].textContent = info.stats?.tasksCompleted || 0;
+        row.cells[5].textContent = BigInt(info.stats?.primesFound || 0).toLocaleString();
+        row.cells[6].textContent = info.cpuCores || 'N/A';
+        row.cells[7].textContent = info.stats?.memory || 'N/A';
+        row.cells[8].textContent = info.browserInfo || 'Unknown';
+        // Add a 'Terminate' button to the row if it doesn't already have one.
+        if (!row.cells[9].hasChildNodes()) {
+            const terminateBtn = document.createElement('button');
+            terminateBtn.textContent = 'Terminate';
+            terminateBtn.className = 'btn btn-danger btn-sm';
+            terminateBtn.onclick = () => {
+                // Add a confirmation dialog before terminating a worker.
+                if (confirm(`Are you sure you want to terminate worker ${id}?`)) {
+                    socket.send(JSON.stringify({ type: 'terminateWorker', workerId: id }));
+                }
+            };
+            row.cells[9].appendChild(terminateBtn);
+        }
+    }
+    
+    // Function to remove a worker's row from the table when they disconnect.
+    function removeWorkerRow(id) {
+        const row = document.getElementById(`worker-row-${id}`);
+        if (row) row.remove();
+    }
+
+    // Function to build or update the progress bars for each task.
+    function buildProgressUI(results) {
+        ui.progressContainer.innerHTML = '';
+        let totalCompleted = 0;
+        let currentTotalPrimes = 0n;
+        for (let i = 0; i < state.totalTasks; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'progress-bar';
+            bar.id = `bar-${i}`;
+            // If a result exists for this task, mark it as completed.
+            if (results && results[i] !== null) {
+                const count = BigInt(results[i]);
+                bar.style.backgroundColor = '#2ecc71'; // Green color for completed
+                bar.textContent = `Task ${i}: Done`;
+                currentTotalPrimes += count;
+                totalCompleted++;
+            } else {
+                bar.textContent = `Task ${i}: Waiting`;
+            }
+            ui.progressContainer.appendChild(bar);
+        }
+        // Update the summary stats.
+        ui.tasksCompletedSpan.textContent = `${totalCompleted} / ${state.totalTasks}`;
+        ui.runningTotalSpan.textContent = currentTotalPrimes.toLocaleString();
+    }
+    
+    // This function manages the enabled/disabled state of the control buttons
+    // based on the current computation state.
+    function updateUIState(results = []) {
+        const hasResults = results && results.some(r => r !== null);
+        const isPaused = !state.isRunning && hasResults;
+
+        if (state.isRunning) {
+            ui.computationStatusSpan.textContent = 'Running';
+            ui.startBtn.disabled = true;
+            ui.resumeBtn.disabled = true;
+            ui.pauseBtn.disabled = false;
+            ui.stopBtn.disabled = false;
+        } else if (isPaused) {
+            ui.computationStatusSpan.textContent = 'Paused';
+            ui.startBtn.disabled = false;
+            ui.resumeBtn.disabled = false;
+            ui.pauseBtn.disabled = true;
+            ui.stopBtn.disabled = false;
+        } else { // Idle state (not running, no results)
+            ui.computationStatusSpan.textContent = 'Idle';
+            ui.startBtn.disabled = false;
+            ui.resumeBtn.disabled = true;
+            ui.pauseBtn.disabled = true;
+            ui.stopBtn.disabled = true;
+        }
+         ui.startBtn.textContent = 'Start New Computation';
+    }
+
+    // Main function to establish and manage the WebSocket connection.
+    function connectDirectorSocket() {
+        log('Attempting to connect Director to coordinator...');
+        socket = new WebSocket(COORDINATOR_WS_URL);
+
+        // When the connection opens, register this client as the 'director'.
+        socket.onopen = () => {
+            log('✅ Connected. Registering as Director...');
+            socket.send(JSON.stringify({ type: 'registerDirector' }));
+            ui.startBtn.textContent = 'Start New Computation';
+        };
+
+        // This is the main message handler for all communication from the server.
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            switch (data.type) {
+                case 'log':
+                    log(data.message);
+                    break;
+                case 'fullState':
+                    // This is received when the director first connects or reconnects.
+                    // It syncs the entire state of the computation.
+                    log('🔄 Received full state from server. Rebuilding UI...');
+                    state.totalTasks = data.totalTasks;
+                    state.nValue = data.nValue;
+                    state.isRunning = data.isRunning;
+                    ui.nValueSpan.textContent = state.nValue.toLocaleString();
+                    buildProgressUI(data.results);
+                    state.workerStats.clear();
+                    ui.workersTableBody.innerHTML = '';
+                    if (data.workers) {
+                       data.workers.forEach(([id, info]) => {
+                            state.workerStats.set(id, info);
+                            updateWorkerRow(id, info);
+                       });
+                    }
+                    ui.connectedWorkersCountSpan.textContent = state.workerStats.size;
+                    updateUIState(data.results);
+                    break;
+                case 'progress':
+                    // A single task has been completed.
+                    const bar = document.getElementById(`bar-${data.taskId}`);
+                    if (bar) {
+                        bar.style.backgroundColor = '#2ecc71';
+                        bar.textContent = `Task ${data.taskId}: Done`;
+                    }
+                    ui.tasksCompletedSpan.textContent = `${data.totalCompleted} / ${state.totalTasks}`;
+                    
+                    // Recalculate the total primes found by summing up from all workers.
+                    let currentTotal = 0n;
+                    state.workerStats.forEach(worker => {
+                        currentTotal += BigInt(worker.stats.primesFound || 0);
+                    });
+                    ui.runningTotalSpan.textContent = currentTotal.toLocaleString();
+                    break;
+                case 'complete':
+                    // The entire computation is finished.
+                    log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${BigInt(data.totalPrimes).toLocaleString()}`);
+                    state.isRunning = false;
+                    updateUIState();
+                    break;
+                case 'workerUpdate':
+                    // A worker's status or stats have changed.
+                    state.workerStats.set(data.workerId, data.workerInfo);
+                    updateWorkerRow(data.workerId, data.workerInfo);
+                    ui.connectedWorkersCountSpan.textContent = state.workerStats.size;
+                    break;
+                case 'workerRemoved':
+                    // A worker has disconnected.
+                    state.workerStats.delete(data.workerId);
+                    removeWorkerRow(data.workerId);
+                    ui.connectedWorkersCountSpan.textContent = state.workerStats.size;
+                    break;
+            }
+        };
+
+        // Handles the WebSocket connection closing.
+        socket.onclose = () => {
+            log('❌ Director disconnected. Reconnecting in 5 seconds...');
+            // Disable all buttons and show a disconnected message.
+            ui.startBtn.disabled = true;
+            ui.resumeBtn.disabled = true;
+            ui.pauseBtn.disabled = true;
+            ui.stopBtn.disabled = true;
+            ui.startBtn.textContent = 'Disconnected';
+            // Attempt to reconnect after a delay.
+            setTimeout(connectDirectorSocket, 5000);
+        };
+
+        // Handles WebSocket errors.
+        socket.onerror = (error) => {
+            log('❌ Director WebSocket error. Check console.');
+            console.error('WebSocket Error:', error);
+            socket.close(); // This will trigger the onclose handler for reconnection.
+        };
+    }
+
+    // Event handler for the 'Start New Computation' button.
+    ui.startBtn.onclick = () => {
+        if (confirm('This will clear all previous logs and results. Are you sure?')) {
+            log('Sending command to start new computation...');
+            socket.send(JSON.stringify({ type: 'startComputation' }));
+            state.isRunning = true;
+            updateUIState();
+        }
+    };
+    
+    // Event handler for the 'Resume' button.
+    ui.resumeBtn.onclick = () => {
+        log('Sending command to resume computation...');
+        socket.send(JSON.stringify({ type: 'resumeComputation' }));
+        state.isRunning = true;
+        updateUIState();
+    };
+    
+    // Event handler for the 'Pause' button.
+    ui.pauseBtn.onclick = () => {
+        log('Sending command to pause computation...');
+        socket.send(JSON.stringify({ type: 'pauseComputation' }));
+        state.isRunning = false;
+        updateUIState();
+    };
+
+    // Event handler for the 'Stop & Reset' button.
+    ui.stopBtn.onclick = () => {
+        if (confirm('This will stop the computation and reset all progress. Are you sure?')) {
+            log('Sending command to stop and reset computation...');
+            socket.send(JSON.stringify({ type: 'stopComputation' }));
+            state.isRunning = false;
+            updateUIState();
+        }
+    };
+
+    // Initial call to connect to the server when the page loads.
+    connectDirectorSocket();
+</script>
