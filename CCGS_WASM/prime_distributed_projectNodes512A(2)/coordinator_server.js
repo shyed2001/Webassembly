@@ -20,9 +20,10 @@ const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
 console.log('Coordinator server running on ws://192.168.1.100:8080');
 
 const N = 5120000000;
-const TOTAL_TASKS = 512;
-const HEARTBEAT_INTERVAL = 30000;
-const TASK_TIMEOUT = 120000; // 2 minutes
+const TOTAL_TASKS = 1024; //512
+const HEARTBEAT_INTERVAL = 90000; // 90 seconds
+// This is the interval for checking worker health and task timeouts.
+const TASK_TIMEOUT = 770000; //  minutes // 12 minutes
 const STATE_FILE = path.join(process.cwd(), 'computation_state.json');
 
 // --- STATE VARIABLES ---

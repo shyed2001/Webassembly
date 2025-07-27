@@ -11,7 +11,7 @@ const workerCountSpan = document.getElementById('worker-count');
 const workerTableBody = document.querySelector('#worker-table tbody');
 const workers = {}; // Object to store data for each connected worker
 
-const TOTAL_TASKS = 1024; // 512
+const TOTAL_TASKS = 2048; // 1024; // 512 or 1024
 let runningTotal = 0n; // Initialize runningTotal as a BigInt
 
 const log = (message) => {
