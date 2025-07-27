@@ -7,6 +7,203 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #333; display: flex; flex-direction: column; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; align-items: center; }
+        .container { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); padding: 24px; margin-bottom: 20px; width: 100%; max-width: 1000px; }
+        .header { font-size: 1.8rem; font-weight: 700; color: #2c3e50; margin-bottom: 20px; text-align: center; }
+        .section-title { font-size: 1.25rem; font-weight: 600; color: #34495e; margin-bottom: 12px; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background-color 0.3s ease, transform 0.1s ease; }
+        .btn-primary { background-color: #3498db; color: white; }
+        .btn-primary:hover:not(:disabled) { background-color: #2980b9; transform: translateY(-1px); }
+        .btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .log-area { background-color: #2c3e50; color: #ecf0f1; padding: 12px; border-radius: 8px; font-family: 'monospace'; height: 200px; overflow-y: scroll; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9rem; }
+        .progress-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+        .progress-bar { background-color: #bdc3c7; color: #2c3e50; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; flex-grow: 1; text-align: center; min-width: 120px; transition: background-color 0.3s ease; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .text-green-500 { color: #28a745; } .text-red-500 { color: #dc3545; } .text-blue-500 { color: #007bff; }
+    </style>
+</head>
+<body>
+    <h1 class="header">Distributed Prime Computation - Director</h1>
+    <div class="container flex flex-col items-center">
+        <h2 class="section-title w-full text-center">Control Panel & Live Stats</h2>
+        <button id="start-btn" class="btn btn-primary mt-4" disabled>Connecting...</button>
+        <div class="mt-6 w-full">
+            <p class="font-bold mb-2">Tasks Completed: <span id="tasks-completed">0 / 512</span></p>
+            <p class="font-bold mb-2">Running Total Primes: <span id="running-total">0</span></p>
+            <div id="progress-container" class="progress-container"></div>
+        </div>
+        <div class="mt-6 w-full">
+            <h3 class="font-bold mb-2">Connected Workers: <span id="connected-workers-count">0</span></h3>
+            <div class="overflow-x-auto">
+                <table id="workers-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Status</th><th>Current Task</th><th>Tasks Done</th><th>Primes Found</th><th>Last Update</th><th>Browser/OS</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="mt-6 w-full">
+            <h3 class="font-bold mb-2">Director Log:</h3>
+            <div id="log" class="log-area"></div>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const logDiv = document.getElementById('log');
+        const progressContainer = document.getElementById('progress-container');
+        const tasksCompletedSpan = document.getElementById('tasks-completed');
+        const runningTotalSpan = document.getElementById('running-total');
+        const connectedWorkersCountSpan = document.getElementById('connected-workers-count');
+        const workersTableBody = document.querySelector('#workers-table tbody');
+
+        const TOTAL_TASKS = 512;
+        let runningTotal = 0n;
+        const workerStats = new Map();
+        let socket;
+
+        const COORDINATOR_WS_URL = 'ws://192.168.1.100:8080'; // <-- IMPORTANT: USE YOUR SERVER'S LAN IP
+
+        const log = (message) => {
+            logDiv.textContent += message + '\n';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        function updateWorkersTable() {
+            workersTableBody.innerHTML = '';
+            workerStats.forEach((info, id) => {
+                const row = workersTableBody.insertRow();
+                const statusClass = info.status === 'Idle' ? 'text-green-500' : info.status === 'Busy' ? 'text-blue-500' : 'text-red-500';
+                row.insertCell().textContent = id.substring(0, 8) + '...';
+                row.insertCell().innerHTML = `<span class="${statusClass}">${info.status || 'N/A'}</span>`;
+                row.insertCell().textContent = info.currentTask !== null ? `Task ${info.currentTask}` : 'N/A';
+                row.insertCell().textContent = info.stats?.tasksCompleted || 0;
+                row.insertCell().textContent = BigInt(info.stats?.primesFound || 0).toLocaleString();
+                row.insertCell().textContent = info.stats?.lastTaskTime ? new Date(info.stats.lastTaskTime).toLocaleTimeString() : 'N/A';
+                row.insertCell().textContent = info.browserInfo || 'Unknown';
+            });
+            connectedWorkersCountSpan.textContent = workerStats.size;
+        }
+
+        function buildProgressUI(results) {
+            progressContainer.innerHTML = '';
+            runningTotal = 0n;
+            let totalCompleted = 0;
+
+            for (let i = 0; i < TOTAL_TASKS; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'progress-bar';
+                bar.id = `bar-${i}`;
+                if (results && results[i] !== null) {
+                    const count = BigInt(results[i]);
+                    bar.style.backgroundColor = '#2ecc71';
+                    bar.textContent = `Task ${i}: Done (${count.toLocaleString()})`;
+                    runningTotal += count;
+                    totalCompleted++;
+                } else {
+                    bar.textContent = `Task ${i}: Waiting...`;
+                }
+                progressContainer.appendChild(bar);
+            }
+            tasksCompletedSpan.textContent = `${totalCompleted} / ${TOTAL_TASKS}`;
+            runningTotalSpan.textContent = runningTotal.toLocaleString();
+        }
+
+        function connectDirectorSocket() {
+            log('Attempting to connect Director to coordinator...');
+            socket = new WebSocket(COORDINATOR_WS_URL);
+
+            socket.onopen = () => {
+                log('✅ Connected. Registering as Director...');
+                socket.send(JSON.stringify({ type: 'registerDirector' }));
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Computation';
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                switch (data.type) {
+                    case 'log':
+                        log(data.message);
+                        break;
+                    case 'fullState': // New message type for state sync
+                        log('🔄 Received full state from server. Rebuilding UI...');
+                        buildProgressUI(data.results);
+                        data.workers.forEach(([id, info]) => workerStats.set(id, info));
+                        updateWorkersTable();
+                        break;
+                    case 'progress':
+                        const bar = document.getElementById(`bar-${data.taskId}`);
+                        if (bar) {
+                            bar.style.backgroundColor = '#2ecc71';
+                            bar.textContent = `Task ${data.taskId}: Done (${BigInt(data.count).toLocaleString()})`;
+                        }
+                        runningTotal += BigInt(data.count);
+                        tasksCompletedSpan.textContent = `${data.totalCompleted} / ${TOTAL_TASKS}`;
+                        runningTotalSpan.textContent = runningTotal.toLocaleString();
+                        break;
+                    case 'complete':
+                        log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${BigInt(data.totalPrimes).toLocaleString()}`);
+                        startBtn.disabled = false;
+                        startBtn.textContent = 'Start Computation';
+                        break;
+                    case 'workerUpdate':
+                        workerStats.set(data.workerId, data.workerInfo);
+                        updateWorkersTable();
+                        break;
+                    case 'workerRemoved':
+                        workerStats.delete(data.workerId);
+                        updateWorkersTable();
+                        break;
+                }
+            };
+
+            socket.onclose = () => {
+                log('❌ Director disconnected. Reconnecting in 5 seconds...');
+                startBtn.disabled = true;
+                startBtn.textContent = 'Disconnected';
+                setTimeout(connectDirectorSocket, 5000);
+            };
+
+            socket.onerror = (error) => {
+                log('❌ Director WebSocket error. Check console.');
+                socket.close(); // Triggers onclose for reconnect logic
+            };
+        }
+
+        startBtn.onclick = () => {
+            log('Sending command to start computation...');
+            startBtn.disabled = true;
+            startBtn.textContent = 'Computation Running...';
+            workerStats.clear();
+            updateWorkersTable();
+            buildProgressUI(null); // Reset progress bars
+            socket.send(JSON.stringify({ type: 'startComputation' }));
+        };
+
+        // Initial setup
+        buildProgressUI(null);
+        connectDirectorSocket();
+    </script>
+</body>
+</html>
+
+<!-- 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Prime Computation - Director</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f0f2f5;
@@ -117,7 +314,7 @@
 
     <h1 class="header">Distributed Prime Computation - Director</h1>
 
-    <!-- Director Section -->
+    // <!-- Director Section 
     <div class="container flex flex-col items-center">
         <h2 class="section-title w-full text-center">Control Panel & Live Stats</h2>
         <button id="start-btn" class="btn btn-primary mt-4">Start Computation</button>
@@ -126,7 +323,7 @@
             <p class="font-bold mb-2">Tasks Completed: <span id="tasks-completed">0 / 512 </span></p>
             <p class="font-bold mb-2">Running Total Primes: <span id="running-total">0</span></p>
             <div id="progress-container" class="progress-container">
-                <!-- Progress bars will be inserted here by JS -->
+               Progress bars will be inserted here by JS 
             </div>
         </div>
 
@@ -146,7 +343,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Worker rows will be inserted here by JS -->
+                     -- Worker rows will be inserted here by JS 
                     </tbody>
                 </table>
             </div>
@@ -158,7 +355,7 @@
         </div>
     </div>
 
-    <!-- Director Client Script -->
+    Director Client Script
     <script>
         const startBtn = document.getElementById('start-btn');
         const logDiv = document.getElementById('log');
@@ -325,3 +522,5 @@
         };
     </script>
 </body>
+
+-->
