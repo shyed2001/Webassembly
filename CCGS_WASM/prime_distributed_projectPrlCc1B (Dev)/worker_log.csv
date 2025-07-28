@@ -1,6 +1,2 @@
 Timestamp,WorkerID,IPAddress,CPU_Cores,Browser,Status
-2025-07-28T09:29:03.383Z,worker-mdmwi2tdgw0q0yvosuk,192.168.0.113,12,"Firefox on Windows",Started Computation
-2025-07-28T09:29:03.383Z,worker-mdmwiloy257wldafnac,192.168.0.102,8,"Chrome on Android",Started Computation
-2025-07-28T09:29:03.384Z,worker-mdmwjie9b6utajc1i34,192.168.0.152,8,"Chrome on Android",Started Computation
-2025-07-28T09:30:46.800Z,worker-mdmwjie9b6utajc1i34,192.168.0.152,8,"Chrome on Android",Disconnected
-2025-07-28T09:33:57.602Z,worker-mdmwiloy257wldafnac,192.168.0.102,8,"Chrome on Android",Disconnected
+2025-07-28T10:17:46.743Z,worker-mdmwi2tdgw0q0yvosuk,192.168.0.113,12,"Firefox on Windows",Started Computation
