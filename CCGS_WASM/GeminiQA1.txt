@@ -81,9 +81,7 @@ Task 1: Done (302)
 prime_dist...Cc1B - Copy
 Uploaded 
 show all the relevent info the director page with director controls, and or give manage tasks page withall task stats with json file read and write or also make manage worker page with those are current codes.
-
 In addition to previously discussed fearurs and corrections --
-
 I want also, worker Stats with json file read or write. directors and managers can monitor, control and update and or offload. but workers can only observe and see what is going, what are being done who is doing what , how much is being done. also gather and show how much data is being generated, gathered and sent and or received to all. and all other required modifications for a showcase project or demonstraction project to impress and att ract. collect all DSA and DBMS related data in csv and or json files and alsoread wriute and show analysis page too. also error logs and arror messages or analysis. and other features for fuure imptovements.
 
 
@@ -96,11 +94,8 @@ I want also, worker Stats with json file read or write. directors and managers c
 I did what u said in your last answer, only few inprovements
 
 Can see the full worker ID on Worker and dirrector page. but no real inprovement in worker web page.
-
 Distributed Prime Computation - Worker
-
 Worker Status
-
 Worker ID: worker-mdm0tcfo6zh9w9iq6h9
 ..................................
 ...........................................
@@ -111,23 +106,13 @@ Worker ID: worker-mdm0tcfo6zh9w9iq6h9
 
 
 can resume tasks if directors reconnects.
-
-
-
 cpu and memory usage not whowing and the entire task list and progress bar with green colors gone ? few browser and OS unknown ?
-
 N Value: The director pag show the upper limit of the calculation.
-
 but why task list progress bar green colors and task details gone now?
-
 And what about --- show all the relevent info the director page with director controls, and or give manage tasks page withall task stats with json file read and write or also make manage worker page with those are current codes.
-
 In addition to previously discussed fearurs and corrections --
-
 I want also, worker Stats with json file read or write. directors and managers can monitor, control and update and or offload. but workers can only observe and see what is going, what are being done who is doing what , how much is being done. also gather and show how much data is being generated, gathered and sent and or received to all. and all other required modifications for a showcase project or demonstraction project to impress and att ract. collect all DSA and DBMS related data in csv and or json files and alsoread wriute and show analysis page too. also error logs and arror messages or analysis. and other features for fuure imptovements.show all the relevent info the director page with director controls, and or give manage tasks page withall task stats with json file read and write or also make manage worker page with those are current codes.
-
 In addition to previously discussed fearurs and corrections --
-
 I want also, worker Stats with json file read or write. directors and managers can monitor, control and update and or offload. but workers can only observe and see what is going, what are being done who is doing what , how much is being done. also gather and show how much data is being generated, gathered and sent and or received to all. and all other required modifications for a showcase project or demonstraction project to impress and att ract. collect all DSA and DBMS related data in csv and or json files and alsoread wriute and show analysis page too. also error logs and arror messages or analysis. and other features for fuure imptovements. also add other scientific stuffs. and also optimize JS with asm.js
 
 
