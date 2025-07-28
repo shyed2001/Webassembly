@@ -3606,5 +3606,3 @@ Timestamp,WorkerID,IPAddress,CPU_Cores,Browser,Status
 2025-07-28T21:11:01.251Z,worker-mdnlj1cvgoxhnhuy3il,192.168.1.104,8,"Chrome on Android",Connected
 2025-07-28T21:11:01.698Z,worker-mdnliq747cpk89tg564,192.168.1.101,4,"Chrome on Windows",Connected
 2025-07-28T21:11:01.730Z,worker-mdnliqtm0sq3f49t7vjk,192.168.1.101,4,"Chrome on Windows",Connected
-2025-07-28T21:12:49.304Z,worker-mdnlj1cvgoxhnhuy3il,192.168.1.104,8,"Chrome on Android",Disconnected
-2025-07-28T21:12:55.083Z,worker-mdnlj1cvgoxhnhuy3il,192.168.1.104,8,"Chrome on Android",Connected

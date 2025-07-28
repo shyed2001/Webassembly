@@ -4,8 +4,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process'; // We still need exec for the restart command
-
 
 // --- CONFIGURATION ---
 const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
@@ -128,7 +126,7 @@ function assignTaskToAvailableWorker() {
                 workerData.taskAssignedTime = Date.now();
                 workerData.ws.send(JSON.stringify({ type: 'task', task }));
                 logToDirector(`Assigned task ${task.taskId} to worker ${workerId}`);
-                updateDirectorWorkerInfo(workerId, { ...workerData, status: 'Busy', currentTask: task.taskId, ipAddress: workerData.ipAddress });
+                updateDirectorWorkerInfo(workerId, { ...workerData, status: 'Busy', currentTask: task.taskId });
                 logTaskEvent(task.taskId, workerId, 'Assigned');
                 saveState();
                 return;
@@ -158,7 +156,7 @@ setInterval(() => {
                 workerData.isBusy = false;
                 workerData.assignedTask = null;
                 workerData.taskAssignedTime = null;
-                updateDirectorWorkerInfo(workerId, { ...workerData, status: 'Idle (Timed Out)', currentTask: null, ipAddress: workerData.ipAddress });
+                updateDirectorWorkerInfo(workerId, { ...workerData, status: 'Idle (Timed Out)', currentTask: null });
                 saveState();
                 assignTaskToAvailableWorker();
             }
@@ -182,7 +180,6 @@ wss.on('connection', (ws, req) => {
                     type: 'fullState',
                     nValue: N,
                     totalTasks: TOTAL_TASKS,
-                    isRunning: isRunning,
                     results: results,
                     workers: Array.from(workers.entries()).map(([id, worker]) => {
                         const { ws, ...workerInfo } = worker;
@@ -207,65 +204,34 @@ wss.on('connection', (ws, req) => {
                     currentTask: null
                 };
                 workers.set(workerId, newWorkerData);
-                logToDirector(`Worker ${workerId} at ${clientIp} connected.`);
+                logToDirector(`Worker ${workerId} connected.`);
                 logWorkerEvent(workerId, clientIp, newWorkerData.cpuCores, newWorkerData.browserInfo, 'Connected');
                 updateDirectorWorkerInfo(workerId, newWorkerData);
                 assignTaskToAvailableWorker();
                 break;
 
-          case 'startComputation':
-                if (fs.existsSync(STATE_FILE)) {
-                    logToDirector('Clearing previous state for a new computation.');
-                    fs.unlinkSync(STATE_FILE); // Delete the old state file
-                }
+            case 'startComputation':
+                if (isRunning) return logToDirector('Computation already running.');
                 isRunning = true;
                 computationStartTime = Date.now();
                 initializeTasks();
                 // Clear old logs for a new run
                 fs.writeFileSync(TASK_LOG_FILE, 'Timestamp,TaskID,WorkerID,Status,Duration(ms)\n');
+                fs.writeFileSync(WORKER_LOG_FILE, 'Timestamp,WorkerID,IPAddress,CPU_Cores,Browser,Status\n');
+                workers.forEach(worker => {
+                    worker.stats = { tasksCompleted: 0, primesFound: 0n, lastTaskTime: null };
+                    logWorkerEvent(worker.ws.workerId, worker.ipAddress, worker.cpuCores, worker.browserInfo, 'Started Computation');
+                });
                 logToDirector(`Starting new computation...`);
                 saveState();
                 workers.forEach((w, id) => assignTaskToAvailableWorker());
                 break;
 
-            case 'pauseComputation':
-                if (isRunning) {
-                    isRunning = false;
-                    logToDirector('⏸️ Computation paused.');
-                    saveState();
-                }
-                break;
-
-            case 'resumeComputation':
-                if (!isRunning) {
-                    isRunning = true;
-                    logToDirector('▶️ Computation resumed.');
-                    saveState();
-                    // Re-assign tasks to all available workers
-                    assignTaskToAvailableWorker(); 
-                }
-                break;
-            
-            case 'restartServer':
-                logToDirector('🔄 Server restart initiated...');
-                // Use PM2's programmatic restart command
-                exec('pm2 restart coordinator', (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`exec error: ${error}`);
-                        logToDirector(`Error restarting server: ${error.message}`);
-                        return;
-                    }
-                    console.log(`stdout: ${stdout}`);
-                    console.error(`stderr: ${stderr}`);
-                });
-                break;
-
-
             case 'terminateWorker':
                 const workerToTerminate = workers.get(data.workerId);
                 if (workerToTerminate) {
                     logToDirector(`Director is terminating worker ${data.workerId}`);
-                    workerToTerminate.ws.terminate(); // Forcefully close the connection
+                    workerToTerminate.ws.terminate();
                 }
                 break;
 
@@ -298,7 +264,7 @@ wss.on('connection', (ws, req) => {
                 const completedTotal = results.filter(r => r !== null).length;
                 
                 updateDirectorProgress(data.taskId, primeCount, completedTotal);
-                updateDirectorWorkerInfo(data.workerId, { ...worker, status: 'Idle', currentTask: null, ipAddress: worker.ipAddress });
+                updateDirectorWorkerInfo(data.workerId, { ...worker, status: 'Idle', currentTask: null });
                 saveState();
 
                 if (completedTotal === TOTAL_TASKS) {
@@ -320,7 +286,7 @@ wss.on('connection', (ws, req) => {
                 taskQueue.unshift(errorWorker.assignedTask);
                 errorWorker.isBusy = false;
                 errorWorker.assignedTask = null;
-                updateDirectorWorkerInfo(data.workerId, { ...errorWorker, status: 'Error', currentTask: null, ipAddress: errorWorker.ipAddress });
+                updateDirectorWorkerInfo(data.workerId, { ...errorWorker, status: 'Error', currentTask: null });
                 saveState();
                 assignTaskToAvailableWorker();
                 break;

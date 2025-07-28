@@ -4,7 +4,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process'; // We still need exec for the restart command
+import { exec } from 'child_process';
 
 
 // --- CONFIGURATION ---
@@ -213,53 +213,52 @@ wss.on('connection', (ws, req) => {
                 assignTaskToAvailableWorker();
                 break;
 
-          case 'startComputation':
-                if (fs.existsSync(STATE_FILE)) {
-                    logToDirector('Clearing previous state for a new computation.');
-                    fs.unlinkSync(STATE_FILE); // Delete the old state file
+            case 'startComputation':
+                if (isRunning) {
+                    if (fs.existsSync(STATE_FILE)) {
+                        fs.unlinkSync(STATE_FILE);
+                    }
                 }
                 isRunning = true;
                 computationStartTime = Date.now();
                 initializeTasks();
                 // Clear old logs for a new run
                 fs.writeFileSync(TASK_LOG_FILE, 'Timestamp,TaskID,WorkerID,Status,Duration(ms)\n');
+                fs.writeFileSync(WORKER_LOG_FILE, 'Timestamp,WorkerID,IPAddress,CPU_Cores,Browser,Status\n');
+                workers.forEach(worker => {
+                    worker.stats = { tasksCompleted: 0, primesFound: 0n, lastTaskTime: null };
+                    logWorkerEvent(worker.ws.workerId, worker.ipAddress, worker.cpuCores, worker.browserInfo, 'Started Computation');
+                });
                 logToDirector(`Starting new computation...`);
                 saveState();
                 workers.forEach((w, id) => assignTaskToAvailableWorker());
                 break;
 
             case 'pauseComputation':
-                if (isRunning) {
-                    isRunning = false;
-                    logToDirector('⏸️ Computation paused.');
-                    saveState();
-                }
+                isRunning = false;
+                logToDirector('Computation paused.');
+                saveState();
                 break;
 
             case 'resumeComputation':
-                if (!isRunning) {
-                    isRunning = true;
-                    logToDirector('▶️ Computation resumed.');
-                    saveState();
-                    // Re-assign tasks to all available workers
-                    assignTaskToAvailableWorker(); 
-                }
-                break;
-            
-            case 'restartServer':
-                logToDirector('🔄 Server restart initiated...');
-                // Use PM2's programmatic restart command
-                exec('pm2 restart coordinator', (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`exec error: ${error}`);
-                        logToDirector(`Error restarting server: ${error.message}`);
-                        return;
-                    }
-                    console.log(`stdout: ${stdout}`);
-                    console.error(`stderr: ${stderr}`);
-                });
+                isRunning = true;
+                logToDirector('Computation resumed.');
+                saveState();
+                workers.forEach((w, id) => assignTaskToAvailableWorker());
                 break;
 
+            case 'restartServer':
+                logToDirector('Restarting server...');
+                // This is a basic restart, a more robust solution would use a process manager like PM2
+                exec('node coordinator_server.js', (err, stdout, stderr) => {
+                    if (err) {
+                        console.error('Error restarting server:', err);
+                        return;
+                    }
+                    console.log(stdout);
+                });
+                process.exit();
+                break;
 
             case 'terminateWorker':
                 const workerToTerminate = workers.get(data.workerId);

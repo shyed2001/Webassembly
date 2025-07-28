@@ -1,0 +1,16 @@
+Timestamp,WorkerID,IPAddress,CPU_Cores,Browser,Status
+2025-07-28T19:59:59.637Z,worker-mdnizwt1qpdwi6sqh4,192.168.1.101,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.637Z,worker-mdniznhld6k7ass2io,192.168.1.102,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.638Z,worker-mdnizorfwot1n8c947c,192.168.1.102,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.638Z,worker-mdnizz0msm4tk4g91x,192.168.1.101,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.638Z,worker-mdncx5vhdincyi2a9bb,192.168.1.100,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.639Z,worker-mdncx87da83ljp3wrwh,192.168.1.100,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.639Z,worker-mdnizmfy5lkpkxaoaqp,192.168.1.102,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.639Z,worker-mdnizy172zm04dczuib,192.168.1.101,4,"Chrome on Windows",Started Computation
+2025-07-28T19:59:59.639Z,worker-mdnizdhkhq0bl49m5ph,192.168.1.114,8,"Firefox on Windows",Started Computation
+2025-07-28T19:59:59.639Z,worker-mdnizcifpagrex3ztzf,192.168.1.114,8,"Firefox on Windows",Started Computation
+2025-07-28T19:59:59.640Z,worker-mdnizbncmucw0l8r5g,192.168.1.114,8,"Firefox on Windows",Started Computation
+2025-07-28T19:59:59.640Z,worker-mdniv2w0r6yed0i2s9a,192.168.1.108,8,"Firefox on Windows",Started Computation
+2025-07-28T20:00:32.684Z,worker-mdnj8vq6whikoxu96xh,192.168.1.105,8,"Chrome on Android",Connected
+2025-07-28T20:00:43.356Z,worker-mdnj93ub8421v8uzxtu,192.168.1.107,8,"Chrome on Android",Connected
+2025-07-28T20:00:52.878Z,worker-mdnj98lj59h763t406w,192.168.1.104,8,"Chrome on Android",Connected
