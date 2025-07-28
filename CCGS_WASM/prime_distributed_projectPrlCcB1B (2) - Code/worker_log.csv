@@ -16,3 +16,6 @@ Timestamp,WorkerID,IPAddress,CPU_Cores,Browser,Status
 2025-07-27T20:23:06.788Z,worker-mdm3zqeoab8v6kwy7jr,192.168.1.104,8,"Chrome on Android",Started Computation
 2025-07-27T20:23:06.789Z,worker-mdm3zy65zrctshkddd,192.168.1.116,8,"Chrome on Android",Started Computation
 2025-07-27T20:23:06.789Z,worker-mdm4l6qgqldzlpu465,192.168.1.112,4,"Chrome on Android",Started Computation
+2025-07-28T04:14:55.519Z,worker-mdm41dlr9mlxqiyq5g,192.168.1.113,3,"Chrome on Windows",Connected
+2025-07-28T04:14:55.549Z,worker-mdm41c9kuydmj5lv85i,192.168.1.113,3,"Chrome on Windows",Connected
+2025-07-28T04:14:55.578Z,worker-mdm41b6sx2bj43qv0bs,192.168.1.113,3,"Chrome on Windows",Connected
