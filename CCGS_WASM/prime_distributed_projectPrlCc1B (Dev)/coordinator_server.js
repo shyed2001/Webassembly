@@ -1,7 +1,4 @@
 // In: prime_distributed_projectPrlCc1B - Copy/coordinator_server.js
-// FINAL VERSION: Includes robust state management, CSV logging, and full computation control.
-
-// In: prime_distributed_projectPrlCc1B - Copy/coordinator_server.js
 // FINAL VERSION: Includes CSV logging, worker control, and enhanced state management.
 
 import { WebSocketServer, WebSocket } from 'ws';
@@ -10,8 +7,8 @@ import path from 'path';
 
 // --- CONFIGURATION ---
 const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
-console.log('Coordinator server running on ws://192.168.1.100:8080');
-
+// console.log('Coordinator server running on ws://192.168.1.100:8080');
+console.log('Coordinator server running on ws://192.168.0.113:8080');
 const N = 5120000;
 const TOTAL_TASKS = 2048;
 const HEARTBEAT_INTERVAL = 30000;

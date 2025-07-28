@@ -6,15 +6,12 @@ https://g.co/gemini/share/0b7a8bccd9a2
 
 
 node coordinator_server.js
-
 python -m http.server 8008 --bind 0.0.0.0
-
 same commands to runthose servers?
 
 
 
 Distributed Prime Computation - Director
-
 
 
 
@@ -102,9 +99,6 @@ Worker ID: worker-mdm0tcfo6zh9w9iq6h9
 ...............................................
 ..............................................
 [12:41:24 AM] Assigned task 479 to worker worker-m... 
-
-
-
 can resume tasks if directors reconnects.
 cpu and memory usage not whowing and the entire task list and progress bar with green colors gone ? few browser and OS unknown ?
 N Value: The director pag show the upper limit of the calculation.
@@ -165,6 +159,10 @@ task_log.csv, worker_log.csv -- happened.
 why no stop computation button. computation will should freeze on clic stop computation. 
 
  On click - Start new compuation page does not refresh and  does not clears out computation state json file and creates or start a new compute json.. This will clear all previous logs and results. Are you sure you want to start a new computation?   Director html page is very slow and unsresponsive. 
+
+
+
+
 
 
 
