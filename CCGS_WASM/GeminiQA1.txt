@@ -7,7 +7,15 @@ https://g.co/gemini/share/0b7a8bccd9a2
 
 node coordinator_server.js
 python -m http.server 8008 --bind 0.0.0.0
-same commands to runthose servers?
+same commands to run those servers?
+
+npm install pm2 -g
+pm2 list
+pm2 log
+pm2 stop all
+pm2 delete all
+pm2 kill
+pm2 start ecosystem.config.cjs
 
 
 
@@ -404,11 +412,6 @@ This will restart the coordinator again, this time with the watch feature turned
 This manual toggle is the correct way to handle this in PM2. It gives you direct control over when you want the server to automatically restart.
 
 
-
-
-
-
-
 pm2 start ecosystem.config.cjs and pm2 restart coordinator --no-watch can i combine them and run my server, without ever using watch?
 
 
@@ -417,7 +420,11 @@ CCGSP MSc MCSE CSE SUB
 Custom Gem
 
 Show thinking
-Yes, absolutely. You can and should do this. Running pm2 restart coordinator --no-watch every time is a temporary fix. The best way to permanently run your server without the watch feature is to disable it directly in your ecosystem.config.cjs file.
+Yes, absolutely. You can and should do this. 
+Running 
+pm2 restart coordinator --no-watch 
+every time is a temporary fix. 
+The best way to permanently run your server without the watch feature is to disable it directly in your ecosystem.config.cjs file.
 
 This tells PM2 to never watch for file changes for the coordinator process from the moment it starts.
 

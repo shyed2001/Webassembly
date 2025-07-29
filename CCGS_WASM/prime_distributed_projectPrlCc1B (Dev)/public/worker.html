@@ -81,8 +81,8 @@
     let workerSocket;
 
     // Replace with your actual WebSocket URL
-    const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.108:8080'; // <-- ENSURE THIS IS YOUR SERVER IP
-    //const COORDINATOR_WS_URL_WORKER = 'ws://192.168.0.113:8080';
+    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.108:8080'; // <-- ENSURE THIS IS YOUR SERVER IP
+    const COORDINATOR_WS_URL_WORKER = 'ws://192.168.0.113:8080';
 
     const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
 

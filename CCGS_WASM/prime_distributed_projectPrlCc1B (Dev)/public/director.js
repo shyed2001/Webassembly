@@ -11,7 +11,7 @@ const workerCountSpan = document.getElementById('worker-count');
 const workerTableBody = document.querySelector('#worker-table tbody');
 const workers = {}; // Object to store data for each connected worker
 
-const TOTAL_TASKS = 2048; // 1024; // 512 or 1024
+const TOTAL_TASKS = 10000; // 2048; // 1024; // 512 or 1024
 let runningTotal = 0n; // Initialize runningTotal as a BigInt
 
 const log = (message) => {
@@ -25,8 +25,8 @@ const log = (message) => {
 // https://xn05c0cs-8080.asse.devtunnels.ms/
 // const socket = new WebSocket('ws://xn05c0cs-8080.asse.devtunnels.ms:8080');
 // Remember to use your actual IP address here if testing on other devices
-const socket = new WebSocket('ws://192.168.1.108:8080');
-// const socket = new WebSocket('ws://192.168.0.113:8080');
+// const socket = new WebSocket('ws://192.168.1.108:8080');
+const socket = new WebSocket('ws://192.168.0.113:8080');
 socket.onopen = () => {
     log('✅ Connected. Registering as Director...');
     socket.send(JSON.stringify({ type: 'registerDirector' }));

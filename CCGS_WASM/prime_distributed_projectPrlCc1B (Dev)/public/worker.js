@@ -14,9 +14,9 @@ statusDiv.textContent = 'Connecting to coordinator...';
 // https://xn05c0cs-8080.asse.devtunnels.ms/
 // const socket = new WebSocket('ws://xn05c0cs-8080.asse.devtunnels.ms:8080');
 // Remember to use your actual IP address here if testing on other devices
-// const socket = new WebSocket('ws://192.168.0.113:8080'); 
+const socket = new WebSocket('ws://192.168.0.113:8080'); 
 // const socket = new WebSocket('ws://<your-ip-address>:8080');
-const socket = new WebSocket('ws://192.168.1.108:8080');
+//const socket = new WebSocket('ws://192.168.1.108:8080');
 
 socket.onopen = () => {
     statusDiv.textContent = '✅ Connected. Awaiting tasks.';

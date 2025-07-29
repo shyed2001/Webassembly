@@ -83,7 +83,7 @@
             <div><strong>Status:</strong> <span id="computation-status">Idle</span></div>
             <div><strong>Upper Limit (N):</strong> <span id="n-value">N/A</span></div>
             <div><strong>Connected Workers:</strong> <span id="worker-count">0</span></div>
-            <div><strong>Tasks Completed:</strong> <span id="tasks-completed">0 / 0</span></div>
+            <div><strong>Tasks Completed:</strong> <span id="tasks-completed">0 / ${TOTAL_TASKS}</span></div>
             <div><strong>Total Primes Found:</strong> <span id="running-total">0</span></div>
             </div>
         </div>
@@ -137,7 +137,10 @@
         let runningTotal = 0n; // BigInt for total primes (uses n suffix for BigInt literal). Why: Primes count can be large; BigInt handles arbitrary size. Data: BigInt type.
         const workerStats = new Map(); // Map to store worker info by ID. Why: Efficient key-value storage for quick lookups/updates. DSA: Map (hash table-like) for O(1) access. Data: Keys are worker IDs (strings), values are objects with worker details.
         let socket; // Variable for WebSocket object. Why: For real-time communication with server.
-        const COORDINATOR_WS_URL = 'ws://192.168.1.108:8080'; // Constant for WebSocket URL. Why: Connects to coordinator server. Data: String URL; ws:// for non-secure WebSocket.
+        // WebSocket URL constant. Why: Centralizes URL for easy updates. How: String constant for WebSocket connection. Data: URL string.
+        //const COORDINATOR_WS_URL = 'ws://localhost:8080';
+        const COORDINATOR_WS_URL = 'ws://192.168.0.113:8080'; // Local network IP for coordinator server. Why: Connects to the coordinator WebSocket server. Data: String URL; ws:// for non-secure WebSocket.
+        // const COORDINATOR_WS_URL = 'ws://192.168.1.108:8080'; // Constant for WebSocket URL. Why: Connects to coordinator server. Data: String URL; ws:// for non-secure WebSocket.
 
         const log = (message) => { // Arrow function for logging. Parameters: message (string). Why: Appends messages to log div and scrolls to bottom.
             logDiv.textContent += message + '\n'; // Appends message with newline to textContent. How: textContent for plain text manipulation. Data flow: Updates DOM directly.
