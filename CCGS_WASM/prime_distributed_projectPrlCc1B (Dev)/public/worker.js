@@ -1,131 +1,88 @@
+// File: /public/worker.js
+// This script controls the worker page, which performs the actual prime number calculations.
 
+import { config } from './config.js';
+import { getClientInfo } from './stats.js';
 
-
-import wasmFactory from './prime_library.js';
+// --- UI Element Selections ---
 const statusDiv = document.getElementById('status');
-let wasmModule = null;
+const workerIdSpan = document.getElementById('worker-id');
+const tasksCompletedSpan = document.getElementById('tasks-completed');
+const primesFoundSpan = document.getElementById('primes-found');
 
-statusDiv.textContent = 'Connecting to coordinator...';
+// --- State Variables ---
+let workerId = localStorage.getItem('workerId');
+if (!workerId) {
+    workerId = 'worker-' + Date.now().toString(36) + Math.random().toString(36).substring(2);
+    localStorage.setItem('workerId', workerId);
+}
+workerIdSpan.textContent = workerId;
 
-// const socket = new WebSocket('ws://localhost:8080'); // Remember to use your IP 
-//192.168.1.107 Lan Ethernet
-//192.168.59.244
-//192.168.1.106 WiFi
-// https://xn05c0cs-8080.asse.devtunnels.ms/
-// const socket = new WebSocket('ws://xn05c0cs-8080.asse.devtunnels.ms:8080');
-// Remember to use your actual IP address here if testing on other devices
-const socket = new WebSocket('ws://192.168.0.113:8080'); 
-// const socket = new WebSocket('ws://<your-ip-address>:8080');
-//const socket = new WebSocket('ws://192.168.1.108:8080');
+let workerSocket;
+const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+let myTasksCompleted = 0;
+let myPrimesFound = 0n;
 
-socket.onopen = () => {
-    statusDiv.textContent = '✅ Connected. Awaiting tasks.';
-    socket.send(JSON.stringify({ type: 'registerWorker' }));
-};
+function connectWorkerSocket() {
+    statusDiv.textContent = 'Connecting to coordinator...';
+    workerSocket = new WebSocket(config.WEBSOCKET_URL);
 
-socket.onmessage = async (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type !== 'task') return;
+    // --- WebSocket Event Handlers ---
 
-    const { task } = data;
-    statusDiv.textContent = `Computing task #${task.taskId}...`;
+    workerSocket.onopen = () => {
+        statusDiv.textContent = '✅ Connected. Awaiting tasks.';
+        const clientInfo = getClientInfo();
+        workerSocket.send(JSON.stringify({
+            type: 'registerWorker',
+            workerId: workerId,
+            browserInfo: clientInfo.browserInfo,
+            cpuCores: clientInfo.cpuCores,
+        }));
+    };
 
-    try {
-        if (!wasmModule) {
-            statusDiv.textContent = `Loading WASM Module for task #${task.taskId}...`;
-            wasmModule = await wasmFactory();
+    // ⬇️ *** THIS IS THE FIX *** ⬇️
+    // The server sends a 'ping' every 30 seconds. We must respond with a 'pong'
+    // to let the server know this worker is still alive and responsive.
+    workerSocket.addEventListener('ping', () => {
+        workerSocket.pong();
+    });
+
+    workerSocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type !== 'task') return;
+
+        const { task } = data;
+        statusDiv.textContent = `Computing task #${task.taskId}...`;
+        computationWorker.postMessage({ task });
+    };
+
+    computationWorker.onmessage = (e) => {
+        const { type, taskId, count, message } = e.data;
+        if (type === 'error') {
+            console.error(`Error in computation worker for task ${taskId}:`, message);
+            statusDiv.textContent = `❌ Error on task #${taskId}. Reporting to server.`;
+            workerSocket.send(JSON.stringify({ type: 'error', workerId, taskId, message }));
+        } else if (type === 'result') {
+            myTasksCompleted++;
+            myPrimesFound += BigInt(count);
+            tasksCompletedSpan.textContent = myTasksCompleted;
+            primesFoundSpan.textContent = myPrimesFound.toLocaleString();
+            workerSocket.send(JSON.stringify({ type: 'result', workerId, taskId, count }));
+            statusDiv.textContent = '✅ Task complete. Awaiting next task.';
         }
-        
-        const functionToCall = `worker_func_${task.taskId}`;
-        
-        statusDiv.textContent = `Executing C++ for task #${task.taskId}...`;
-        
-        // Convert the string numbers from the JSON message into BigInts
-        const startBigInt = BigInt(task.start);
-        const endBigInt = BigInt(task.end);
+    };
 
-        // Tell ccall to expect and return a 'bigint'
-        const primeCount = wasmModule.ccall(
-            functionToCall,
-            'bigint', // Return type
-            ['bigint', 'bigint'], // Argument types
-            [startBigInt, endBigInt] // Arguments
-        );
-        
-        // Convert the BigInt result back to a string for JSON
-        socket.send(JSON.stringify({ type: 'result', taskId: task.taskId, count: primeCount.toString() }));
-        statusDiv.textContent = '✅ Task complete. Awaiting next task.';
+    workerSocket.onclose = () => {
+        statusDiv.textContent = '❌ Disconnected. Reconnecting in 5 seconds...';
+        setTimeout(connectWorkerSocket, 5000);
+    };
 
-    } catch (error) {
-        console.error(`Error executing task ${task.taskId}:`, error);
-        statusDiv.textContent = `❌ Error on task #${task.taskId}. Reporting to server.`;
-        
-        socket.send(JSON.stringify({ type: 'error', taskId: task.taskId, message: error.message }));
-    }
-};
+    workerSocket.onerror = (err) => {
+        console.error('WebSocket Error:', err);
+        statusDiv.textContent = '❌ Connection Error.';
+        workerSocket.close();
+    };
+}
 
-socket.onclose = () => {
-    statusDiv.textContent = '❌ Disconnected from coordinator. Please refresh the page to reconnect.';
-};
-
-
-
-/*
-
-import wasmFactory from './prime_library.js';
-const statusDiv = document.getElementById('status');
-let wasmModule = null;
-
-statusDiv.textContent = 'Connecting to coordinator...';
-// Remember to use your actual IP address here if testing on other devices
-// const socket = new WebSocket('ws://localhost:8080'); 
-// 192.168.59.244
-//192.168.1.107
-//192.168.1.106
-// const socket = new WebSocket('wss://xn05c0cs-8080.asse.devtunnels.ms:8080'); 
-const socket = new WebSocket('ws://192.168.1.106:8080'); 
-socket.onopen = () => {
-    statusDiv.textContent = '✅ Connected. Awaiting tasks.';
-    socket.send(JSON.stringify({ type: 'registerWorker' }));
-};
-
-socket.onmessage = async (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type !== 'task') return;
-
-    const { task } = data;
-    statusDiv.textContent = `Computing task #${task.taskId}...`;
-
-    try {
-        if (!wasmModule) {
-            statusDiv.textContent = `Loading WASM Module for task #${task.taskId}...`;
-            wasmModule = await wasmFactory();
-        }
-        
-        const functionToCall = `worker_func_${task.taskId}`;
-        
-        statusDiv.textContent = `Executing C++ for task #${task.taskId}...`;
-        
-        const primeCount = wasmModule.ccall(
-            functionToCall,
-            'number',
-            ['number', 'number'],
-            [task.start, task.end]
-        );
-        
-        socket.send(JSON.stringify({ type: 'result', taskId: task.taskId, count: primeCount }));
-        statusDiv.textContent = '✅ Task complete. Awaiting next task.';
-
-    } catch (error) {
-        console.error(`Error executing task ${task.taskId}:`, error);
-        statusDiv.textContent = `❌ Error on task #${task.taskId}. Reporting to server.`;
-        
-        socket.send(JSON.stringify({ type: 'error', taskId: task.taskId, message: error.message }));
-    }
-};
-
-socket.onclose = () => {
-    statusDiv.textContent = '❌ Disconnected from coordinator. Please refresh the page to reconnect.';
-};
-
-*/
+// --- Initial Execution ---
+connectWorkerSocket();

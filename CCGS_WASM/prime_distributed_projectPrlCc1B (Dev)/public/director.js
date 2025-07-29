@@ -1,298 +1,190 @@
+// File: /public/director.js
+import { config } from './config.js';
 
-//director.js
+// --- UI Element Selections ---
 const startBtn = document.getElementById('start-btn');
+const pauseResumeBtn = document.getElementById('pause-resume-btn');
+const refreshBtn = document.getElementById('refresh-btn');
+const restartBtn = document.getElementById('restart-btn');
 const logDiv = document.getElementById('log');
 const progressContainer = document.getElementById('progress-container');
 const tasksCompletedSpan = document.getElementById('tasks-completed');
 const runningTotalSpan = document.getElementById('running-total');
-
-// New elements for the worker stats table
+const nValueSpan = document.getElementById('n-value');
 const workerCountSpan = document.getElementById('worker-count');
-const workerTableBody = document.querySelector('#worker-table tbody');
-const workers = {}; // Object to store data for each connected worker
+const computationStatusSpan = document.getElementById('computation-status');
+const workersTableBody = document.querySelector('#workers-table tbody');
 
-const TOTAL_TASKS = 10000; // 2048; // 1024; // 512 or 1024
-let runningTotal = 0n; // Initialize runningTotal as a BigInt
+// --- State Variables ---
+let TOTAL_TASKS = 0;
+let N_VALUE = 0;
+let IS_RUNNING = false;
+let runningTotal = 0n;
+const workerStats = new Map();
+let socket;
 
 const log = (message) => {
     logDiv.textContent += message + '\n';
     logDiv.scrollTop = logDiv.scrollHeight;
 };
-// const socket = new WebSocket('ws://localhost:8080'); // Remember to use your IP 
-//192.168.1.107 Lan Ethernet
-//192.168.59.244
-//192.168.1.106 WiFi
-// https://xn05c0cs-8080.asse.devtunnels.ms/
-// const socket = new WebSocket('ws://xn05c0cs-8080.asse.devtunnels.ms:8080');
-// Remember to use your actual IP address here if testing on other devices
-// const socket = new WebSocket('ws://192.168.1.108:8080');
-const socket = new WebSocket('ws://192.168.0.113:8080');
-socket.onopen = () => {
-    log('✅ Connected. Registering as Director...');
-    socket.send(JSON.stringify({ type: 'registerDirector' }));
-};
 
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    switch(data.type) {
-        case 'log':
-            log(data.message);
-            break;
+function connectDirectorSocket() {
+    log('Attempting to connect Director to coordinator...');
+    socket = new WebSocket(config.WEBSOCKET_URL);
 
-        // --- NEW: Logic to handle worker connections ---
-        case 'workerConnected':
-            workers[data.workerId] = { info: data.info, status: 'Idle', lastTaskTime: '---' };
-            updateWorkerTable();
-            log(`Worker #${data.workerId} connected.`);
-            break;
-            
-        case 'workerDisconnected':
-            delete workers[data.workerId];
-            updateWorkerTable();
-            log(`Worker #${data.workerId} disconnected.`);
-            break;
-        // ---------------------------------------------
+    socket.onopen = () => {
+        log('✅ Connected. Registering as Director...');
+        socket.send(JSON.stringify({ type: 'registerDirector' }));
+        updateUIState();
+    };
 
-        case 'progress':
-            // Update the specific progress bar
-            const bar = document.getElementById(`bar-${data.taskId}`);
-            if (bar) {
-                bar.style.backgroundColor = '#2ecc71'; // Green
-                bar.textContent = `Task ${data.taskId}: Done (${BigInt(data.count).toLocaleString()})`;
-            }
-            
-            // Update running totals using BigInt math
-            runningTotal += BigInt(data.count);
-            tasksCompletedSpan.textContent = `${data.totalCompleted} / ${TOTAL_TASKS}`;
-            runningTotalSpan.textContent = runningTotal.toLocaleString();
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        switch (data.type) {
+            case 'log':
+                log(data.message);
+                break;
+            case 'fullState':
+                log('🔄 Received full state from server. Rebuilding UI...');
+                TOTAL_TASKS = data.totalTasks;
+                N_VALUE = data.nValue;
+                IS_RUNNING = data.isRunning;
+                nValueSpan.textContent = N_VALUE.toLocaleString();
+                buildProgressUI(data.results);
+                workerStats.clear();
+                if (data.workers) {
+                    data.workers.forEach(([id, info]) => workerStats.set(id, info));
+                }
+                updateWorkersTable();
+                updateUIState();
+                break;
+            case 'progress':
+                const bar = document.getElementById(`bar-${data.taskId}`);
+                if (bar) {
+                    bar.style.backgroundColor = '#2ecc71';
+                    bar.textContent = `Task ${data.taskId}: Done`;
+                }
+                tasksCompletedSpan.textContent = `${data.totalCompleted} / ${TOTAL_TASKS}`;
+                runningTotal = 0n;
+                workerStats.forEach(worker => {
+                    runningTotal += BigInt(worker.stats.primesFound || 0);
+                });
+                runningTotalSpan.textContent = runningTotal.toLocaleString();
+                break;
+            case 'complete':
+                log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${BigInt(data.totalPrimes).toLocaleString()}`);
+                IS_RUNNING = false;
+                updateUIState();
+                break;
+            case 'workerUpdate':
+                workerStats.set(data.workerId, data.workerInfo);
+                updateWorkersTable();
+                break;
+            case 'workerRemoved':
+                workerStats.delete(data.workerId);
+                updateWorkersTable();
+                break;
+        }
+    };
 
-            // --- NEW: Update the worker's status in the table ---
-            if (workers[data.workerId]) {
-                workers[data.workerId].status = 'Idle';
-                workers[data.workerId].lastTaskTime = data.taskDuration.toFixed(2);
-                updateWorkerTable();
-            }
-            break;
+    socket.onclose = () => {
+        log('❌ Director disconnected. Reconnecting in 5 seconds...');
+        IS_RUNNING = false;
+        updateUIState();
+        setTimeout(connectDirectorSocket, 5000);
+    };
 
-        case 'complete':
-            log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${BigInt(data.totalPrimes).toLocaleString()}`);
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Computation';
-            // Mark all workers as Idle
-            for (const id in workers) {
-                workers[id].status = 'Idle';
-            }
-            updateWorkerTable();
-            break;
-    }
-};
+    socket.onerror = (error) => {
+        log('❌ Director WebSocket error. Check console.');
+        console.error('WebSocket Error:', error);
+        socket.close();
+    };
+}
 
-startBtn.onclick = () => {
-    log('Sending command to start computation...');
-    startBtn.disabled = true;
-    startBtn.textContent = 'Computation Running...';
-    
-    // Reset UI
+function updateWorkersTable() {
+    workersTableBody.innerHTML = '';
+    workerStats.forEach((info, id) => {
+        const row = workersTableBody.insertRow();
+        const statusClass = info.status === 'Idle' ? 'text-green-500' : info.status === 'Busy' ? 'text-blue-500' : 'text-red-500';
+        row.innerHTML = `
+            <td>${id}</td>
+            <td>${info.ipAddress || 'N/A'}</td>
+            <td class="${statusClass}">${info.status || 'N/A'}</td>
+            <td>${info.currentTask !== null ? `Task ${info.currentTask}` : 'N/A'}</td>
+            <td>${info.stats?.tasksCompleted || 0}</td>
+            <td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td>
+            <td>${info.cpuCores || 'N/A'}</td>
+            <td>${info.stats?.memory || 'N/A'}</td>
+            <td>${info.browserInfo || 'Unknown'}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="window.terminateWorker('${id}')">Terminate</button></td>
+        `;
+    });
+    workerCountSpan.textContent = workerStats.size;
+}
+
+function buildProgressUI(results) {
     progressContainer.innerHTML = '';
-    runningTotal = 0n; // Reset BigInt total
-    tasksCompletedSpan.textContent = `0 / ${TOTAL_TASKS}`;
-    runningTotalSpan.textContent = '0';
-
-    // Create placeholder bars
+    let completedCount = 0;
     for (let i = 0; i < TOTAL_TASKS; i++) {
         const bar = document.createElement('div');
         bar.className = 'progress-bar';
         bar.id = `bar-${i}`;
-        bar.textContent = `Task ${i}: Waiting...`;
+        if (results && results[i] !== null) {
+            bar.style.backgroundColor = '#2ecc71';
+            bar.textContent = `Task ${i}: Done`;
+            completedCount++;
+        } else {
+            bar.textContent = `Task ${i}: Waiting`;
+        }
         progressContainer.appendChild(bar);
     }
+    tasksCompletedSpan.textContent = `${completedCount} / ${TOTAL_TASKS}`;
+}
 
-    // --- NEW: Update worker table to show tasks are being assigned ---
-    for (const id in workers) {
-        workers[id].status = 'Assigning...';
-    }
-    updateWorkerTable();
-
-    socket.send(JSON.stringify({ type: 'startComputation' }));
-};
-
-// --- NEW: Function to render the worker table ---
-function updateWorkerTable() {
-    workerTableBody.innerHTML = ''; // Clear the table
-    workerCountSpan.textContent = Object.keys(workers).length;
-
-    for (const id in workers) {
-        const worker = workers[id];
-        const row = workerTableBody.insertRow();
-        
-        row.innerHTML = `
-            <td>${id}</td>
-            <td>${worker.status}</td>
-            <td>${worker.info.cpuCores}</td>
-            <td>${worker.info.deviceMemory}</td>
-            <td>${worker.assignedTask ? worker.assignedTask.taskId : '---'}</td>
-            <td>${worker.lastTaskTime}</td>
-            <td>${worker.info.userAgent}</td>
-        `;
+function updateUIState() {
+    computationStatusSpan.textContent = IS_RUNNING ? 'Running' : 'Paused';
+    startBtn.disabled = IS_RUNNING;
+    pauseResumeBtn.disabled = (workerStats.size === 0);
+    if (IS_RUNNING) {
+        pauseResumeBtn.textContent = 'Pause Computation';
+        pauseResumeBtn.classList.remove('btn-secondary');
+        pauseResumeBtn.classList.add('btn-warning');
+    } else {
+        pauseResumeBtn.textContent = 'Resume Computation';
+        pauseResumeBtn.classList.remove('btn-warning');
+        pauseResumeBtn.classList.add('btn-secondary');
     }
 }
 
-
-
-/*
-const startBtn = document.getElementById('start-btn');
-const logDiv = document.getElementById('log');
-const progressContainer = document.getElementById('progress-container');
-const tasksCompletedSpan = document.getElementById('tasks-completed');
-const runningTotalSpan = document.getElementById('running-total');
-
-const TOTAL_TASKS = 10;
-let runningTotal = 0n; // Initialize runningTotal as a BigInt
-
-const log = (message) => {
-    logDiv.textContent += message + '\n';
-    logDiv.scrollTop = logDiv.scrollHeight;
-};
-
-// Remember to use your actual IP address here if testing on other devices
-const socket = new WebSocket('ws://localhost:8080');
-
-socket.onopen = () => {
-    log('✅ Connected. Registering as Director...');
-    socket.send(JSON.stringify({ type: 'registerDirector' }));
-};
-
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    switch(data.type) {
-        case 'log':
-            log(data.message);
-            break;
-        case 'progress':
-            // Update the specific progress bar
-            const bar = document.getElementById(`bar-${data.taskId}`);
-            if (bar) {
-                bar.style.backgroundColor = '#2ecc71'; // Green
-                bar.textContent = `Task ${data.taskId}: Done (${BigInt(data.count).toLocaleString()})`;
-            }
-            
-            // Update running totals using BigInt math
-            runningTotal += BigInt(data.count);
-            tasksCompletedSpan.textContent = `${data.totalCompleted} / ${TOTAL_TASKS}`;
-            runningTotalSpan.textContent = runningTotal.toLocaleString();
-            break;
-        case 'complete':
-            log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${BigInt(data.totalPrimes).toLocaleString()}`);
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Computation';
-            break;
+window.terminateWorker = (workerId) => {
+    if (confirm(`Are you sure you want to terminate worker ${workerId}?`)) {
+        socket.send(JSON.stringify({ type: 'terminateWorker', workerId }));
     }
 };
 
 startBtn.onclick = () => {
-    log('Sending command to start computation...');
-    startBtn.disabled = true;
-    startBtn.textContent = 'Computation Running...';
-    
-    // Reset UI
-    progressContainer.innerHTML = '';
-    runningTotal = 0n; // Reset BigInt total
-    tasksCompletedSpan.textContent = `0 / ${TOTAL_TASKS}`;
-    runningTotalSpan.textContent = '0';
-
-    // Create placeholder bars
-    for (let i = 0; i < TOTAL_TASKS; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'progress-bar';
-        bar.id = `bar-${i}`;
-        bar.textContent = `Task ${i}: Waiting...`;
-        progressContainer.appendChild(bar);
-    }
-
-    socket.send(JSON.stringify({ type: 'startComputation' }));
-};
-
-
-
-
-
-
-
-/*
-const startBtn = document.getElementById('start-btn');
-const logDiv = document.getElementById('log');
-const progressContainer = document.getElementById('progress-container');
-const tasksCompletedSpan = document.getElementById('tasks-completed');
-const runningTotalSpan = document.getElementById('running-total');
-
-const TOTAL_TASKS = 10;
-let runningTotal = 0;
-
-const log = (message) => {
-    logDiv.textContent += message + '\n';
-    logDiv.scrollTop = logDiv.scrollHeight;
-};
-
-// const socket = new WebSocket('ws://localhost:8080'); // Remember to use your IP 
-//192.168.1.107 Lan Ethernet
-//192.168.59.244
-//192.168.1.106 WiFi
-// https://xn05c0cs-8080.asse.devtunnels.ms/
-// const socket = new WebSocket('ws://xn05c0cs-8080.asse.devtunnels.ms:8080');
-const socket = new WebSocket('ws://192.168.1.106:8080');
-
-socket.onopen = () => {
-    log('✅ Connected. Registering as Director...');
-    socket.send(JSON.stringify({ type: 'registerDirector' }));
-};
-
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    switch(data.type) {
-        case 'log':
-            log(data.message);
-            break;
-        case 'progress':
-            // Update the specific progress bar
-            const bar = document.getElementById(`bar-${data.taskId}`);
-            if (bar) {
-                bar.style.backgroundColor = '#2ecc71'; // Green
-                bar.textContent = `Task ${data.taskId}: Done (${data.count.toLocaleString()})`;
-            }
-            
-            // Update running totals
-            runningTotal += data.count;
-            tasksCompletedSpan.textContent = `${data.totalCompleted} / ${TOTAL_TASKS}`;
-            runningTotalSpan.textContent = runningTotal.toLocaleString();
-            break;
-        case 'complete':
-            log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${data.totalPrimes.toLocaleString()}`);
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Computation';
-            break;
+    if (confirm('This will clear all previous logs and results. Are you sure?')) {
+        log('Sending command to start a new computation...');
+        socket.send(JSON.stringify({ type: 'startComputation' }));
     }
 };
 
-startBtn.onclick = () => {
-    log('Sending command to start computation...');
-    startBtn.disabled = true;
-    startBtn.textContent = 'Computation Running...';
-    
-    // Reset UI
-    progressContainer.innerHTML = '';
-    runningTotal = 0;
-    tasksCompletedSpan.textContent = `0 / ${TOTAL_TASKS}`;
-    runningTotalSpan.textContent = '0';
-
-    // Create placeholder bars
-    for (let i = 0; i < TOTAL_TASKS; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'progress-bar';
-        bar.id = `bar-${i}`;
-        bar.textContent = `Task ${i}: Waiting...`;
-        progressContainer.appendChild(bar);
-    }
-
-    socket.send(JSON.stringify({ type: 'startComputation' }));
+pauseResumeBtn.onclick = () => {
+    const action = IS_RUNNING ? 'pauseComputation' : 'resumeComputation';
+    log(`Sending command to ${action}...`);
+    socket.send(JSON.stringify({ type: action }));
 };
-*/
+
+refreshBtn.onclick = () => {
+    log('Refreshing page...');
+    location.reload(true);
+};
+
+restartBtn.onclick = () => {
+    if (confirm('Are you sure you want to restart the server?')) {
+        log('Sending command to restart the server...');
+        socket.send(JSON.stringify({ type: 'restartServer' }));
+    }
+};
+
+connectDirectorSocket();

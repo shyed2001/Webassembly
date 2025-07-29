@@ -16,8 +16,8 @@ pm2 stop all
 pm2 delete all
 pm2 kill
 pm2 start ecosystem.config.cjs
-
-
+pm2 restart all
+pm2 stop all && pm2 delete all && pm2 kill
 
 Distributed Prime Computation - Director
 

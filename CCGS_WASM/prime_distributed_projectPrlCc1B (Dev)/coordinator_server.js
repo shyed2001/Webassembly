@@ -1,28 +1,34 @@
-// In: prime_distributed_projectPrlCc1B - Copy/coordinator_server.js
-// FINAL VERSION: Includes CSV logging, worker control, and enhanced state management.
-
 import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process'; // We still need exec for the restart command
-
+// ⬇️ *** IMPORT THE CONFIGURATION *** ⬇️
+import { config } from './public/config.js';
 
 // --- CONFIGURATION ---
-const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
+//const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
 // console.log('Coordinator server running on ws://192.168.1.108:8080');
  // WiFi 192.168.0.113
  // Ethernet 192.168.6.15
-console.log('Coordinator server running on ws://192.168.0.113:8080');
-const N = 10000000000; // Total number to compute primes up to. Why: Large enough for significant computation. Data: Integer value.
+//console.log('Coordinator server running on ws://192.168.0.113:8080');
+//const N = 10000000000; // Total number to compute primes up to. Why: Large enough for significant computation. Data: Integer value.
 // const N = 1000000000; // For testing purposes, you can reduce this
 // Why: Smaller range for quicker tests. Data: Integer value.
 // const N = 10000000; // For testing purposes, you can reduce this
-const TOTAL_TASKS = 10000; //2048; // Total number of tasks to split the computation into. Why: Balance between granularity and overhead. Data: Integer value.
-const HEARTBEAT_INTERVAL = 30000;
-const TASK_TIMEOUT = 180000;
+// const TOTAL_TASKS = 10000; //2048; // Total number of tasks to split the computation into. Why: Balance between granularity and overhead. Data: Integer value.
+// const HEARTBEAT_INTERVAL = 30000;
+//const TASK_TIMEOUT = 180000;
+const wss = new WebSocketServer({ port: config.WEBSOCKET_PORT, host: '0.0.0.0' });
+console.log(`Coordinator server running on ${config.WEBSOCKET_URL}`);
+
+const N = config.N;
+const TOTAL_TASKS = config.TOTAL_TASKS;
+const HEARTBEAT_INTERVAL = config.HEARTBEAT_INTERVAL;
+const TASK_TIMEOUT = config.TASK_TIMEOUT;
 const STATE_FILE = path.join(process.cwd(), 'computation_state.json');
 const TASK_LOG_FILE = path.join(process.cwd(), 'task_log.csv');
 const WORKER_LOG_FILE = path.join(process.cwd(), 'worker_log.csv');
+// Why: Configuration allows for easy adjustments without code changes. Data: Integer values for N, TOTAL_TASKS, HEARTBEAT_INTERVAL, TASK_TIMEOUT.
 
 // --- STATE VARIABLES ---
 let directorSocket = null;
@@ -356,3 +362,318 @@ wss.on('connection', (ws, req) => {
 
 // --- INITIALIZATION ---
 loadState();
+
+
+
+/*
+
+
+// In: prime_distributed_projectPrlCc1B - Copy/coordinator_server.js
+// FINAL VERSION: Includes CSV logging, worker control, and enhanced state management.
+
+const WebSocket = require('ws');
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+
+const PORT = 8080;
+const STATE_FILE = './coordinator_state.json';
+const TASK_TIMEOUT = 60000; // 60 seconds
+const HEARTBEAT_INTERVAL = 15000; // 15 seconds
+
+const wss = new WebSocket.Server({ port: PORT });
+console.log(`Coordinator WebSocket server started on port ${PORT}`);
+
+let N;
+let tasks = [];
+let taskQueue = [];
+let workers = new Map(); // Using Map for better performance
+let director = null;
+let isRunning = false;
+let startTime = null;
+let taskSize;
+
+// Load previous state if it exists
+const loadState = () => {
+    if (fs.existsSync(STATE_FILE)) {
+        try {
+            const state = JSON.parse(fs.readFileSync(STATE_FILE));
+            N = state.N;
+            tasks = state.tasks;
+            taskQueue = state.taskQueue;
+            isRunning = state.isRunning || false;
+            startTime = state.startTime;
+            taskSize = state.taskSize;
+            console.log("✅ Previous state loaded successfully.");
+            logToDirector("✅ Previous state loaded successfully.");
+        } catch (error) {
+            console.error("🚨 Error loading state:", error);
+        }
+    }
+};
+
+// Save current state to a file
+const saveState = () => {
+    try {
+        const state = {
+            N,
+            tasks,
+            taskQueue,
+            isRunning,
+            startTime,
+            taskSize,
+            workers: Array.from(workers.values()).map(w => ({ // Don't save WebSocket object
+                id: w.id,
+                isBusy: w.isBusy,
+                assignedTask: w.assignedTask,
+                taskAssignedTime: w.taskAssignedTime,
+                stats: w.stats,
+                ipAddress: w.ipAddress
+            }))
+        };
+        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    } catch (error) {
+        console.error("🚨 Error saving state:", error);
+    }
+};
+
+const broadcast = (data) => {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(data));
+        }
+    });
+};
+
+const logToDirector = (message) => {
+    if (director && director.readyState === WebSocket.OPEN) {
+        director.send(JSON.stringify({ type: 'log', message }));
+    }
+};
+
+const updateDirectorFullState = () => {
+    if (director && director.readyState === WebSocket.OPEN) {
+        const state = {
+            N,
+            tasks,
+            isRunning,
+            taskSize,
+            workers: Array.from(workers.values()).map(w => ({
+                id: w.id,
+                isBusy: w.isBusy,
+                assignedTask: w.assignedTask,
+                stats: w.stats,
+                ipAddress: w.ipAddress,
+                status: w.status
+            }))
+        };
+        director.send(JSON.stringify({ type: 'full-state', state }));
+    }
+};
+
+const updateDirectorWorkerInfo = (workerId, workerData) => {
+    if (director && director.readyState === WebSocket.OPEN) {
+        director.send(JSON.stringify({
+            type: 'worker-update',
+            workerId,
+            workerData: {
+                id: workerId,
+                isBusy: workerData.isBusy,
+                assignedTask: workerData.assignedTask,
+                stats: workerData.stats,
+                ipAddress: workerData.ipAddress,
+                status: workerData.status
+            }
+        }));
+    }
+};
+
+
+const assignTaskToAvailableWorker = () => {
+    if (!isRunning || taskQueue.length === 0) return;
+
+    for (const [workerId, workerData] of workers.entries()) {
+        if (!workerData.isBusy) {
+            const task = taskQueue.shift();
+            if (task) {
+                workerData.isBusy = true;
+                workerData.assignedTask = task;
+                workerData.taskAssignedTime = Date.now();
+                workerData.status = `Working on Task ${task.taskId}`;
+
+                console.log(`Assigning task ${task.taskId} to worker ${workerId}`);
+                logToDirector(`Assigning task ${task.taskId} to worker ${workerId}`);
+                workerData.ws.send(JSON.stringify({ type: 'task', task }));
+                updateDirectorWorkerInfo(workerId, workerData);
+                saveState();
+                break; // Assign one task at a time
+            }
+        }
+    }
+};
+
+
+wss.on('connection', (ws, req) => {
+    const ipAddress = req.socket.remoteAddress;
+    ws.isAlive = true; // Heartbeat flag
+
+    ws.on('pong', () => {
+        // *** DIAGNOSTIC LOGGING ***
+        console.log(`[Heartbeat] Received pong from a client.`);
+        ws.isAlive = true;
+    });
+
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            
+            if (data.type === 'register-director') {
+                director = ws;
+                console.log("👑 Director connected.");
+                logToDirector("👑 Director connected. Syncing state...");
+                updateDirectorFullState();
+                return;
+            }
+
+            // All other messages should be from workers
+            const workerId = ws.id; // Get worker ID after it has been assigned
+            if (!workerId && data.type !== 'register-worker') {
+                console.log("Received message from unregistered worker. Ignoring.");
+                return;
+            }
+            const workerData = workers.get(workerId);
+
+            switch (data.type) {
+                case 'register-worker':
+                    const newWorkerId = `worker-${uuidv4()}`;
+                    ws.id = newWorkerId;
+                    const newWorkerData = {
+                        id: newWorkerId,
+                        ws: ws,
+                        isBusy: false,
+                        assignedTask: null,
+                        taskAssignedTime: null,
+                        stats: { tasksDone: 0, primesFound: 0, cpu: 0, mem: 0, cores: data.cores, browser: data.browser, os: data.os },
+                        ipAddress: ipAddress,
+                        status: "Idle"
+                    };
+                    workers.set(newWorkerId, newWorkerData);
+                    console.log(`Worker ${newWorkerId} at ${ipAddress} connected.`);
+                    logToDirector(`Worker ${newWorkerId} at ${ipAddress} connected.`);
+                    updateDirectorWorkerInfo(newWorkerId, newWorkerData);
+                    assignTaskToAvailableWorker();
+                    break;
+                
+                case 'task-result':
+                    if (workerData && workerData.isBusy) {
+                        const { taskId, primes, timeTaken } = data.result;
+                        console.log(`Received result for task ${taskId} from worker ${workerId}. Primes found: ${primes.length}. Time: ${timeTaken}ms.`);
+                        logToDirector(`Result for task ${taskId} from ${workerId} received.`);
+
+                        // Update task status in the main tasks array
+                        const taskIndex = tasks.findIndex(t => t.taskId === taskId);
+                        if (taskIndex !== -1) {
+                            tasks[taskIndex].status = 'Completed';
+                            tasks[taskIndex].result = primes;
+                            tasks[taskIndex].workerId = workerId;
+                            tasks[taskIndex].timeTaken = timeTaken;
+                        }
+
+                        // Update worker state
+                        workerData.isBusy = false;
+                        workerData.assignedTask = null;
+                        workerData.taskAssignedTime = null;
+                        workerData.stats.tasksDone += 1;
+                        workerData.stats.primesFound += primes.length;
+                        workerData.status = "Idle";
+
+                        updateDirectorWorkerInfo(workerId, workerData);
+                        saveState();
+                        assignTaskToAvailableWorker();
+                    }
+                    break;
+                
+                case 'worker-stats':
+                     if (workerData) {
+                        workerData.stats.cpu = data.stats.cpu;
+                        workerData.stats.mem = data.stats.mem;
+                        updateDirectorWorkerInfo(workerId, workerData);
+                    }
+                    break;
+            }
+        } catch (error) {
+            console.error('Error processing message:', error);
+        }
+    });
+
+    ws.on('close', () => {
+        const workerId = ws.id;
+        if (workerId) {
+            const workerData = workers.get(workerId);
+            if(workerData) {
+                 if (workerData.isBusy && workerData.assignedTask) {
+                    console.log(`Worker ${workerId} disconnected with active task ${workerData.assignedTask.taskId}. Re-queuing.`);
+                    logToDirector(`Worker ${workerId} disconnected with active task. Re-queuing.`);
+                    taskQueue.unshift(workerData.assignedTask);
+                }
+                workers.delete(workerId);
+                console.log(`Worker ${workerId} disconnected.`);
+                logToDirector(`Worker ${workerId} disconnected.`);
+                broadcast({ type: 'worker-disconnected', id: workerId });
+                saveState();
+            }
+           
+        } else if (ws === director) {
+            console.log("👑 Director disconnected.");
+            director = null;
+        }
+    });
+});
+
+// Heartbeat and Timeout check
+setInterval(() => {
+    // *** DIAGNOSTIC LOGGING ***
+    console.log(`[Heartbeat] Running check. Total workers: ${workers.size}`);
+    workers.forEach((workerData, workerId) => {
+        const ws = workerData.ws;
+        // Check if the worker is alive
+        if (ws.isAlive === false) {
+             // *** DIAGNOSTIC LOGGING ***
+            console.log(`[Heartbeat] Terminating unresponsive worker: ${workerId}`);
+            return ws.terminate(); // This will trigger the 'close' event for cleanup
+        }
+        
+        // Assume it's not alive for the next interval, until a pong proves otherwise
+        ws.isAlive = false;
+        // *** DIAGNOSTIC LOGGING ***
+        console.log(`[Heartbeat] Sending ping to ${workerId}`);
+        ws.ping(() => {}); // Send ping
+    });
+
+    // Check for task timeouts
+    if (isRunning) {
+        workers.forEach((workerData, workerId) => {
+            if (workerData.isBusy && (Date.now() - workerData.taskAssignedTime > TASK_TIMEOUT)) {
+                console.log(`[Timeout] Worker ${workerId} timed out on task ${workerData.assignedTask.taskId}.`);
+                logToDirector(`Worker ${workerId} timed out on task ${workerData.assignedTask.taskId}. Re-queuing.`);
+
+                if (workerData.assignedTask) {
+                    taskQueue.unshift(workerData.assignedTask);
+                }
+                
+                // Reset worker state
+                workerData.isBusy = false;
+                workerData.assignedTask = null;
+                workerData.taskAssignedTime = null;
+                workerData.status = 'Idle (Timed Out)';
+                
+                updateDirectorWorkerInfo(workerId, workerData);
+                saveState();
+                assignTaskToAvailableWorker();
+            }
+        });
+    }
+}, HEARTBEAT_INTERVAL);
+
+
+loadState();
+*/

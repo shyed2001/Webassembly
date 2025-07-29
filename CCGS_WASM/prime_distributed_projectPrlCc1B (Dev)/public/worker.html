@@ -7,153 +7,32 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-            color: #333;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-            align-items: center; /* Center content horizontally */
-        }
-        .container {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            padding: 24px;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 600px; /* Smaller max-width for worker */
-        }
-        .header {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #34495e;
-            margin-bottom: 12px;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 8px;
-        }
-        .status-box {
-            background-color: #ecf0f1;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            text-align: center;
-            color: #2c3e50;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #333; }
+        .container { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+        .header { font-size: 1.8rem; font-weight: 700; color: #2c3e50; }
+        .section-title { font-size: 1.25rem; font-weight: 600; color: #34495e; border-bottom: 2px solid #ecf0f1; }
     </style>
 </head>
-<body>
-
-    <h1 class="header">Distributed Prime Computation - Worker</h1>
-
-    <div class="container flex flex-col items-center mt-8">
-        <h2 class="section-title w-full text-center">Worker Status</h2>
-        <div id="worker-id-display" class="text-lg font-bold mt-2">Worker ID: <span id="my-worker-id">N/A</span></div>
-        <div id="status" class="status-box mt-4 w-full">Connecting to coordinator...</div>
-        <div class="mt-4 w-full text-center">
-            <p class="font-bold">Tasks Completed by me: <span id="my-tasks-completed">0</span></p>
-            <p class="font-bold">Primes Found by me: <span id="my-primes-found">0</span></p>
+<body class="flex items-center justify-center min-h-screen">
+    <div class="container text-center p-8 max-w-md w-full">
+        <h1 class="header mb-4">Prime Computation Worker</h1>
+        <div class="p-6 border-2 border-dashed border-gray-300 rounded-lg">
+            <h2 class="section-title pb-2 mb-4">Worker Status</h2>
+            <p class="text-gray-600"><strong>Worker ID:</strong> <span id="worker-id" class="font-mono">N/A</span></p>
+            <p id="status" class="text-lg font-semibold my-4 p-3 bg-gray-100 rounded-md">Initializing...</p>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <div class="p-4 bg-blue-50 rounded-lg">
+                    <p class="text-sm font-medium text-blue-800">Tasks Completed</p>
+                    <p id="tasks-completed" class="text-2xl font-bold text-blue-900">0</p>
+                </div>
+                <div class="p-4 bg-green-50 rounded-lg">
+                    <p class="text-sm font-medium text-green-800">Primes Found</p>
+                    <p id="primes-found" class="text-2xl font-bold text-green-900">0</p>
+                </div>
+            </div>
         </div>
     </div>
 
-  <script type="module">
-    import { getClientInfo } from './stats.js'; // Import our new stats helper
-
-    const statusDiv = document.getElementById('status');
-    const myWorkerIdSpan = document.getElementById('my-worker-id');
-    const myTasksCompletedSpan = document.getElementById('my-tasks-completed');
-    const myPrimesFoundSpan = document.getElementById('my-primes-found');
-
-    let myWorkerId = null;
-    let myTasksCompleted = 0;
-    let myPrimesFound = 0n;
-    let workerSocket;
-
-    // Replace with your actual WebSocket URL
-    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.108:8080'; // <-- ENSURE THIS IS YOUR SERVER IP
-    const COORDINATOR_WS_URL_WORKER = 'ws://192.168.0.113:8080';
-
-    const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
-
-    function generateWorkerId() {
-        return 'worker-' + Date.now().toString(36) + Math.random().toString(36).substring(2);
-    }
-
-    computationWorker.onmessage = (event) => {
-        const data = event.data;
-        switch (data.type) {
-            case 'status':
-                statusDiv.textContent = data.message;
-                break;
-            case 'stillWorking':
-                workerSocket.send(JSON.stringify({ type: 'stillWorking', workerId: myWorkerId, taskId: data.taskId, memory: data.memory }));
-                break;
-            case 'result':
-                const primeCountBigInt = BigInt(data.count);
-                myTasksCompleted++;
-                myPrimesFound += primeCountBigInt;
-                myTasksCompletedSpan.textContent = myTasksCompleted;
-                myPrimesFoundSpan.textContent = myPrimesFound.toLocaleString();
-                statusDiv.textContent = '✅ Task complete. Awaiting next task.';
-                workerSocket.send(JSON.stringify({ type: 'result', workerId: myWorkerId, taskId: data.taskId, count: data.count }));
-                break;
-            case 'error':
-                statusDiv.textContent = `❌ Error on task #${data.taskId}. Reporting to server.`;
-                workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: data.taskId, message: data.message }));
-                break;
-        }
-    };
-    
-    function connectWorkerSocket() {
-        if (myWorkerId === null) {
-            myWorkerId = generateWorkerId();
-            myWorkerIdSpan.textContent = myWorkerId; // Show full ID
-        }
-
-        statusDiv.textContent = 'Connecting to coordinator...';
-        workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
-
-        workerSocket.onopen = () => {
-            statusDiv.textContent = '✅ Connected. Awaiting tasks.';
-            const clientInfo = getClientInfo(); // Get stats
-            workerSocket.send(JSON.stringify({ 
-                type: 'registerWorker', 
-                workerId: myWorkerId, 
-                browserInfo: clientInfo.browserInfo,
-                cpuCores: clientInfo.cpuCores
-            }));
-        };
-
-        workerSocket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'task') {
-                computationWorker.postMessage({ task: data.task });
-            }
-        };
-
-        workerSocket.onclose = () => {
-            statusDiv.textContent = '❌ Disconnected. Reconnecting in 5 seconds...';
-            setTimeout(connectWorkerSocket, 5000);
-        };
-
-        workerSocket.onerror = (error) => {
-            console.error('Worker WebSocket Error:', error);
-            workerSocket.close();
-        };
-    }
-
-    connectWorkerSocket();
-</script>
+    <script type="module" src="./worker.js"></script>
 </body>
 </html>
