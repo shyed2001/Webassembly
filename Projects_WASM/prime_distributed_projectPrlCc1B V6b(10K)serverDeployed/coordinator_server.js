@@ -8,9 +8,8 @@ import { exec } from 'child_process'; // We still need exec for the restart comm
 
 
 // --- CONFIGURATION ---
-// const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
-const wss = new WebSocketServer({ port: 8080, host: '127.0.0.1', path: '/ws' });
-console.log('Coordinator server running on ws://127.0.0.1:8080');
+const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
+console.log('Coordinator server running on ws://0.0.0.0:8080');
 // console.log('Coordinator server running on ws://0.0.0.0:8080  ', wss.options.host, wss.options.port);
 // console.log('Coordinator server running on ws://192.168.1.108:8080');
  // WiFi 192.168.0.113
@@ -19,7 +18,7 @@ console.log('Coordinator server running on ws://127.0.0.1:8080');
 // console.log('Coordinator server running on ws://DESKTOP-NAF9NIA:8080');
 // console.log('Coordinator server running on ws://0.0.0.0:8080  ', wss.options.host, wss.options.port);
 
-const N = 1000000000; // Total number to compute primes up to. Why: Large enough for significant computation. Data: Integer value.
+const N = 100000000; // Total number to compute primes up to. Why: Large enough for significant computation. Data: Integer value.
 // const N = 1000000000; // For testing purposes, you can reduce this
 // Why: Smaller range for quicker tests. Data: Integer value.
 // const N = 10000000; // For testing purposes, you can reduce this

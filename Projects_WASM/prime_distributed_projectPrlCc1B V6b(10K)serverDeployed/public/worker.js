@@ -17,8 +17,7 @@ statusDiv.textContent = 'Connecting to coordinator...';
 // Remember to use your actual IP address here if testing on other devices
 //const socket = new WebSocket('ws://192.168.0.113:8080'); 
 // const socket = new WebSocket('ws://DESKTOP-NAF9NIA:8080');
-// const socket = new WebSocket('ws://91.99.238.128:8080');
-  const socket = new WebSocket('ws://ccgsc-demo.digitalbd.org/ws'); // Your server URL
+const socket = new WebSocket('ws://91.99.238.128:8080');
 // const socket = new WebSocket('ws://<your-ip-address>:8080');
 //const socket = new WebSocket('ws://192.168.1.108:8080');
 

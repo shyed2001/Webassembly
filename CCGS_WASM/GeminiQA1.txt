@@ -9,6 +9,13 @@ node coordinator_server.js
 python -m http.server 8008 --bind 0.0.0.0
 same commands to run those servers?
 
+sudo nginx -t
+sudo systemctl reload nginx
+sudo ufw allow 'Nginx Full'
+
+https://g.co/gemini/share/8f8741db5f60
+https://g.co/gemini/share/8f8741db5f60
+
 npm install
 npm install pm2 -g
 pm2 list

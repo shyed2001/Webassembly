@@ -5,8 +5,6 @@ module.exports = {
     script : "coordinator_server.js",
     // ⬇️ *** CHANGE THIS LINE TO FALSE *** ⬇️
     watch  : false,
-        // Add the user directive for correct file permissions
-    user   : "www-data", 
     env    : {
       NODE_ENV: "development",
     }
