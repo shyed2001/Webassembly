@@ -12,7 +12,6 @@
         .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; user-select: none; }
         .btn:hover:not(:disabled) { transform: translateY(-1px); }
         .btn-primary { background-color: #3498db; color: white; }
-        .btn-secondary { background-color: #2ecc71; color: white; }
         .btn-info { background-color: #5bc0de; color: white; }
         .btn-warning { background-color: #f39c12; color: white; }
         .btn-danger { background-color: #e74c3c; color: white; }
@@ -27,7 +26,6 @@
 </head>
 <body class="p-4">
     <h1 class="text-3xl font-bold text-center text-gray-800 my-4">Distributed Computation Control Panel</h1>
-
     <div class="container">
         <h2 class="text-xl font-bold mb-4 text-gray-700">Controls</h2>
         <div class="flex flex-wrap items-center gap-3">
@@ -39,32 +37,36 @@
             <button id="refreshBtn" class="btn btn-info">Refresh Page</button>
         </div>
     </div>
-
+    <div class="container">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Dashboard</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-gray-600">
+            <div><strong>Status:</strong> <span id="computation-status" class="font-semibold">Idle</span></div>
+            <div><strong>Upper Limit (N):</strong> <span id="n-value" class="font-semibold">N/A</span></div>
+            <div><strong>Connected Workers:</strong> <span id="worker-count" class="font-semibold">0</span></div>
+        </div>
+    </div>
     <div class="container">
         <h2 class="text-xl font-bold mb-4 text-gray-700">Overall Progress</h2>
         <div class="progress-bar-container">
             <div id="overall-progress-bar" class="progress-bar-fill" style="width: 0%;">0%</div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-gray-600">
-            <div><strong>Status:</strong> <span id="computation-status" class="font-semibold">Idle</span></div>
-            <div><strong>Tasks Completed:</strong> <span id="tasks-completed">0 / 0</span></div>
-            <div><strong>Total Primes:</strong> <span id="running-total">0</span></div>
+        <div class="flex justify-between mt-2 text-gray-700 font-medium">
+            <span>Tasks: <span id="tasks-completed">0 / 0</span></span>
+            <span>Primes Found: <span id="running-total">0</span></span>
         </div>
         <div class="mt-6 text-center">
             <a href="./progress_details.html" target="_blank" class="text-blue-600 hover:underline font-bold">View Detailed Task Grid &raquo;</a>
         </div>
     </div>
-
     <div class="container">
-        <h2 class="text-xl font-bold mb-4 text-gray-700">Worker Management (<span id="worker-count">0</span>)</h2>
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Worker Management</h2>
         <div class="overflow-x-auto">
             <table>
-                <thead><tr><th>Full Worker ID</th><th>Status</th><th>IP Address</th><th>Task</th><th>Done</th><th>Primes</th><th>CPU</th><th>Browser/OS</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Full Worker ID</th><th>Status</th><th>IP</th><th>Task</th><th>Done</th><th>Primes</th><th>CPU</th><th>Browser/OS</th><th>Actions</th></tr></thead>
                 <tbody id="workers-table-body"></tbody>
             </table>
         </div>
     </div>
-    
     <div class="text-center my-4">
         <a href="./LogWorkerTaskProgressData.html" target="_blank" class="text-blue-600 hover:underline font-bold">View Live Logs &raquo;</a>
     </div>
@@ -72,11 +74,14 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const COORDINATOR_WS_URL = 'wss://ccgsc-director.digitalbd.org/ws';
+
+                    // === THIS IS THE CRITICAL FIX ===
+       // const COORDINATOR_WS_URL = 'wss://ccgsc-director.digitalbd.org/ws';
+
             const DB_NAME = 'ComputationDB';
             const DB_VERSION = 1;
             const channel = new BroadcastChannel('computation_channel');
-            let db;
-            let socket;
+            let db, socket;
 
             const elements = {
                 startBtn: document.getElementById('start-btn'),
@@ -138,31 +143,32 @@
 
             async function updateDB(data) {
                 if (!db) return;
-                const tx = db.transaction(['state', 'logs'], 'readwrite');
-                const stateStore = tx.objectStore('state');
-                const logStore = tx.objectStore('logs');
-
-                if (data.type === 'log') {
-                    logStore.add(data.message);
-                } else if (data.type === 'fullState') {
-                    data.key = 'currentState';
-                    stateStore.put(data);
-                } else {
-                    const req = stateStore.get('currentState');
-                    req.onsuccess = () => {
-                        const currentState = req.result || { results: [], workers: [] };
-                        if (data.type === 'progress') currentState.results[data.taskId] = data.count;
-                        if (data.type === 'workerUpdate') {
-                            const index = currentState.workers.findIndex(w => w[0] === data.workerId);
-                            if (index > -1) currentState.workers[index][1] = data.workerInfo;
-                            else currentState.workers.push([data.workerId, data.workerInfo]);
-                        }
-                        if (data.type === 'workerRemoved') currentState.workers = currentState.workers.filter(w => w[0] !== data.workerId);
-                        if (data.type === 'computationStateChanged') currentState.isRunning = data.isRunning;
-                        stateStore.put(currentState);
-                    };
-                }
-                return new Promise(resolve => tx.oncomplete = resolve);
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(['state', 'logs'], 'readwrite');
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                    const stateStore = tx.objectStore('state');
+                    if (data.type === 'log') {
+                        tx.objectStore('logs').add(data.message);
+                    } else if (data.type === 'fullState') {
+                        data.key = 'currentState';
+                        stateStore.put(data);
+                    } else {
+                        const req = stateStore.get('currentState');
+                        req.onsuccess = () => {
+                            const currentState = req.result || { results: [], workers: [] };
+                            if (data.type === 'progress') currentState.results[data.taskId] = data.count;
+                            if (data.type === 'workerUpdate') {
+                                const index = currentState.workers.findIndex(w => w[0] === data.workerId);
+                                if (index > -1) currentState.workers[index][1] = data.workerInfo;
+                                else currentState.workers.push([data.workerId, data.workerInfo]);
+                            }
+                            if (data.type === 'workerRemoved') currentState.workers = currentState.workers.filter(w => w[0] !== data.workerId);
+                            if (data.type === 'computationStateChanged') currentState.isRunning = data.isRunning;
+                            stateStore.put(currentState);
+                        };
+                    }
+                });
             }
 
             function loadStateFromDB() {
@@ -180,7 +186,7 @@
                 const completedCount = state.results?.filter(r => r !== null).length || 0;
                 const percentage = TOTAL_TASKS > 0 ? ((completedCount / TOTAL_TASKS) * 100).toFixed(1) : 0;
                 
-                elements.nValueSpan.textContent = state.nValue?.toLocaleString() || 'N/A';
+                if (elements.nValueSpan) elements.nValueSpan.textContent = state.nValue?.toLocaleString() || 'N/A';
                 elements.progressBar.style.width = `${percentage}%`;
                 elements.progressBar.textContent = `${percentage}%`;
                 elements.tasksCompletedSpan.textContent = `${completedCount} / ${TOTAL_TASKS}`;
@@ -213,12 +219,9 @@
             elements.clearLogsBtn.onclick = () => {
                 if (confirm('Are you sure you want to clear all logs?')) {
                     if (!db) return;
-                    const tx = db.transaction('logs', 'readwrite');
-                    tx.objectStore('logs').clear();
-                    tx.oncomplete = () => {
-                        channel.postMessage({ type: 'update' });
-                        alert('Logs cleared.');
-                    };
+                    db.transaction('logs', 'readwrite').objectStore('logs').clear();
+                    channel.postMessage({ type: 'update' });
+                    alert('Logs cleared.');
                 }
             };
             

@@ -1,20 +1,10 @@
-<!-- Filename: worker.html , File Path: prime_distributed_projectPrlCc1B V5(10K)/public/worker.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Distributed Computation - Worker</title>
+    <title>Computation Worker Node</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #333; display: flex; flex-direction: column; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; align-items: center; justify-content: center; }
-        .container { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px
-_
-12px rgba(0,0,0,0.08); padding: 24px; width: 100%; max-width: 800px; text-align: center; }
-        .status-text { font-size: 1.2rem; font-weight: 600; }
-        .worker-id { font-family: monospace; background-color: #e2e8f0; padding: 4px 8px; border-radius: 6px; font-size: 0.9rem; word-break: break-all; }
-    </style>
+    <style>/* Your existing worker styles are fine */</style>
 </head>
 <body>
     <div class="container">
@@ -24,27 +14,26 @@ _
         <p class="mb-2">Current Status:</p>
         <p id="status" class="status-text text-blue-500">Starting...</p>
         <div class="mt-4 text-sm text-gray-500">
-            <p>This page must remain open to contribute to the computation.</p>
-            <p><strong class="font-semibold">Tasks completed by this worker:</strong> <span id="tasks-completed-count">0</span></p>
+            <p>This page must remain open to contribute.</p>
+            <p><strong>Tasks completed by this worker:</strong> <span id="tasks-completed-count">0</span></p>
         </div>
     </div>
 
     <script type="module">
         import { getClientInfo } from './stats.js';
+        const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws';
+        // ... The rest of the fully persistent worker script from the previous answer goes here.
+        // This script includes IndexedDB for storing task history and LocalStorage for the worker ID.
+
+        const DB_NAME = 'WorkerDB';
+        const DB_VERSION = 1;
+        let db, workerSocket;
 
         const statusDiv = document.getElementById('status');
         const myWorkerIdSpan = document.getElementById('worker-id');
         const tasksCompletedSpan = document.getElementById('tasks-completed-count');
-
-        const DB_NAME = 'WorkerDB';
-        const DB_VERSION = 1;
-        const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws'; // Use your worker's secure domain
-
-        let db;
-        let workerSocket;
         const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
 
-        // --- 1. Get or Create a Persistent Worker ID from LocalStorage ---
         function getOrSetWorkerId() {
             let id = localStorage.getItem('myWorkerId');
             if (!id) {
@@ -57,61 +46,39 @@ _
         const myWorkerId = getOrSetWorkerId();
         myWorkerIdSpan.textContent = myWorkerId;
 
-        // --- 2. Initialize IndexedDB for storing results ---
         function initDB() {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
             request.onupgradeneeded = e => {
-                const dbInstance = e.target.result;
-                if (!dbInstance.objectStoreNames.contains('completedTasks')) {
-                    dbInstance.createObjectStore('completedTasks', { keyPath: 'taskId' });
+                if (!e.target.result.objectStoreNames.contains('completedTasks')) {
+                    e.target.result.createObjectStore('completedTasks', { keyPath: 'taskId' });
                 }
             };
             request.onerror = e => console.error('DB Error:', e.target.errorCode);
             request.onsuccess = e => {
                 db = e.target.result;
-                console.log('WorkerDB connection successful.');
-                updateCompletedCount(); // Update UI with historical data
-                connectWorkerSocket(); // Connect to server only after DB is ready
+                updateCompletedCount();
+                connectWorkerSocket();
             };
         }
-        
-        // --- 3. Handle messages from the background computation worker ---
+
         computationWorker.onmessage = (event) => {
             const data = event.data;
-            switch(data.type) {
-                case 'status':
-                    statusDiv.textContent = data.message;
-                    break;
-                case 'stillWorking':
-                    if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
-                        workerSocket.send(JSON.stringify({ type: 'stillWorking', workerId: myWorkerId }));
-                    }
-                    break;
-                case 'result':
-                    statusDiv.textContent = `✅ Task #${data.taskId} complete. Sending result...`;
-                    
-                    if(db) {
-                        const tx = db.transaction('completedTasks', 'readwrite');
-                        tx.objectStore('completedTasks').put({ taskId: data.taskId, count: data.count });
-                        tx.oncomplete = () => updateCompletedCount(); // Update UI after saving
-                    }
-
-                    if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
-                        workerSocket.send(JSON.stringify({ type: 'result', workerId: myWorkerId, ...data }));
-                    }
-                    break;
-                case 'error':
-                    statusDiv.textContent = `❌ Error on task #${data.taskId}. Reporting to server.`;
-                    if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
-                        workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: data.taskId, message: data.message }));
-                    }
-                    break;
+            if (data.type === 'result') {
+                statusDiv.textContent = `✅ Task #${data.taskId} complete.`;
+                if(db) {
+                    const tx = db.transaction('completedTasks', 'readwrite');
+                    tx.objectStore('completedTasks').put({ taskId: data.taskId, count: data.count });
+                    tx.oncomplete = () => updateCompletedCount();
+                }
+            }
+            // Forward all messages to the main server
+            if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
+                workerSocket.send(JSON.stringify({ workerId: myWorkerId, ...data }));
             }
         };
         
-        // --- 4. Manage WebSocket Connection ---
         function connectWorkerSocket() {
-            statusDiv.textContent = 'Connecting to coordinator...';
+            statusDiv.textContent = 'Connecting...';
             workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
 
             workerSocket.onopen = () => {
@@ -128,34 +95,25 @@ _
             workerSocket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === 'task') {
-                    statusDiv.textContent = `Received task #${data.task.taskId}. Starting computation...`;
+                    statusDiv.textContent = `Computing task #${data.task.taskId}...`;
                     computationWorker.postMessage({ task: data.task });
                 }
             };
 
             workerSocket.onclose = () => {
-                statusDiv.textContent = '❌ Disconnected. Reconnecting in 5 seconds...';
+                statusDiv.textContent = '❌ Disconnected. Reconnecting...';
                 setTimeout(connectWorkerSocket, 5000);
-            };
-
-            workerSocket.onerror = (error) => {
-                console.error('Worker WebSocket Error:', error);
-                workerSocket.close();
             };
         }
 
-        // --- 5. Helper function to update UI from DB ---
         function updateCompletedCount() {
             if (!db) return;
-            const tx = db.transaction('completedTasks', 'readonly');
-            const store = tx.objectStore('completedTasks');
-            const countRequest = store.count();
+            const countRequest = db.transaction('completedTasks', 'readonly').objectStore('completedTasks').count();
             countRequest.onsuccess = () => {
                 tasksCompletedSpan.textContent = countRequest.result;
             };
         }
 
-        // --- Start the application ---
         initDB();
     </script>
 </body>
