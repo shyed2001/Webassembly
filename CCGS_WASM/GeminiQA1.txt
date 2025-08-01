@@ -1,5 +1,16 @@
 https://g.co/gemini/share/0b7a8bccd9a2
 
+nginx -t
+
+systemctl reload nginx
+
+systemctl restart nginx
+
+ufw allow 'Nginx Full'
+
+pm2 stop all && pm2 kill && pm2 delete all 
+
+pm2 restart coordinator
 
 sudo nginx -t
 sudo systemctl reload nginx
@@ -7,6 +18,18 @@ sudo systemctl restart nginx
 sudo ufw allow 'Nginx Full'
 sudo pm2 stop all && pm2 kill && pm2 delete all 
 sudo pm2 restart coordinator
+
+sudo pm2 kill
+pm2 kill
+# Navigate to your project directory
+cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
+
+# Start the app with PM2 (no sudo)
+pm2 start coordinator_server.js --name coordinator -i 0
+pm2 startup
+sudo pm2 save
+
+
 
 pm2 stop all && pm2 kill && pm2 delete all 
 sudo pm2 start ecosystem.config.cjs --only coordinator 

@@ -1,30 +1,5 @@
-// ecosystem.config.cjs
-// This file is used by PM2 to manage the coordinator server process.
-// It specifies the application configuration, including the script to run,
-// the user to run it as, and the environment variables.
-// It also enables cluster mode for full parallelism, allowing multiple instances
-// of the coordinator server to run simultaneously for better performance.
-// The log paths are specified to ensure that output and error logs are stored
-// in a specific directory for easy access and monitoring.
-// file path: prime_distributed_projectPrlCc1B%20V5%2810K%29/ecosystem.config.cjs
+// In: prime_distributed_projectPrlCc1B V5(10K)/coordinator_server.js
 
-// This is the final, correct version of ecosystem.config.cjs
-module.exports = {
-  apps : [{
-    name        : "coordinator",
-    script      : "coordinator_server.js",
-    instances   : "max", // Use all available CPU cores
-    exec_mode   : "cluster",
-    watch       : false,
-    env: {
-      "NODE_ENV": "production",
-    }
-  }]
-}
-
-
-
-/* * PM2 Configuration for Coordinator Server
 module.exports = {
   apps : [{
     name      : "coordinator",
@@ -43,10 +18,9 @@ module.exports = {
     }
   }]
 }
-*/
 
-/* PM2 Configuration for Coordinator Server
-This configuration file is used to manage the coordinator server process using PM2.
+
+/*
 module.exports = {
   apps : [{
     name   : "coordinator",

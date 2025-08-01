@@ -1,0 +1,337 @@
+<!--Filename: director.html , File Path: prime_distributed_projectPrlCc1B V5(10K)/public/director.html-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Prime Computation - Director</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #333; display: flex; flex-direction: column; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; align-items: center; }
+        /* Styles the body element: Sets font, background, text color, flex layout for vertical stacking, 
+          full viewport height, no margin, padding, border-box model, and centers content.
+          Why: Establishes the base layout and theme for the entire page.
+          How: Flexbox is used for easy centering and column direction ensures vertical flow.
+          Data: Colors use hex codes for a light theme.
+        */
+        .container { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); padding: 24px; margin-bottom: 20px; width: 100%; max-width: 1200px; }
+        /* Defines a container class for sections: White background, rounded corners, subtle shadow for depth, 
+          padding, bottom margin, full width with a max limit.
+          Why: Creates card-like sections for organization and visual appeal.
+          How: Box-shadow adds an elevation effect.
+          Data flow: Applied to multiple divs for consistent styling.
+        */
+        .header { font-size: 1.8rem; font-weight: 700; color: #2c3e50; margin-bottom: 20px; text-align: center; }
+        /* Styles header class: Larger bold text, dark color, bottom margin, centered. Why: For main title emphasis. */
+        .section-title { font-size: 1.25rem; font-weight: 600; color: #34495e; margin-bottom: 12px; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; }
+        /* Section title styling: Medium size, semi-bold, darker color, underline border, padding. Why: Separates sections visually. */
+        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background-color 0.3s ease, transform 0.1s ease; }
+        /* Base button class: Padding, rounded, bold, pointer cursor, smooth transitions for hover effects.
+          Why: Standardizes button appearance and interactivity.
+          How: Transitions animate color and lift on hover.
+        */
+        .btn-primary { background-color: #3498db; color: white; }
+        /* Primary button variant: Blue background, white text. Why: For main actions like start. */
+        .btn-secondary { background-color: #2ecc71; color: white; }
+        /* Secondary: Green background. Why: For actions like resume. */
+        .btn-warning { background-color: #f39c12; color: white; }
+        /* Warning: Orange for actions like pause. */
+        .btn-danger { background-color: #e74c3c; color: white; }
+        /* Danger: Red for destructive actions like terminate. */
+        .btn:hover:not(:disabled) { transform: translateY(-1px); }
+        /* Hover effect on enabled buttons: Slight upward lift. Why: Provides visual feedback. How: Uses CSS transform; :not(:disabled) excludes disabled buttons. */
+        .btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        /* Disabled button: Gray, no-pointer cursor. Why: Indicates non-interactivity. */
+        .log-area { background-color: #2c3e50; color: #ecf0f1; padding: 12px; border-radius: 8px; font-family: 'monospace'; height: 250px; overflow-y: scroll; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9rem; }
+        /* Log area: Dark background, light text, padding, rounded, fixed height with scroll, preserves whitespace.
+          Why: For console-like logging display.
+          How: Overflow-y enables vertical scrolling when content exceeds height.
+        */
+        .progress-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 15px; max-height: 400px; overflow-y: auto; padding: 10px; border: 1px solid #ecf0f1; border-radius: 8px;}
+        /* Progress grid: Auto-filling columns, min 120px width, gaps, top margin, max height with scroll, border.
+          Why: Displays task bars in a responsive grid.
+          How: Grid layout adapts to container width; auto-fill creates as many columns as fit.
+        */
+        .progress-bar { background-color: #bdc3c7; color: #2c3e50; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; text-align: center; transition: background-color 0.3s ease; }
+        /* Progress bar item: Gray background, dark text, padding, rounded, small text, centered, color transition.
+          Why: Visual representation of task status; transition for smooth color change on completion.
+        */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        /* Table styling: Full width, collapsed borders, top margin. Why: For worker data display. How: Border-collapse merges adjacent borders. */
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9rem; }
+        /* Table cells: Light border, padding, left-aligned, small font. Why: Readable data presentation. */
+        th { background-color: #f2f2f2; font-weight: 600; }
+        /* Headers: Light gray, semi-bold. Why: Distinguishes headers. */
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        /* Even rows: Slight gray for zebra striping. Why: Improves readability. How: :nth-child selector targets every even row. */
+        .text-green-500 { color: #28a745; } .text-red-500 { color: #dc3545; } .text-blue-500 { color: #007bff; }
+        /* Color utility classes: Green for success/idle, red for error, blue for busy. Why: Status indicators; matches Tailwind naming for consistency. */
+        .btn-sm { padding: 4px 8px; font-size: 0.8rem; } /* Added for smaller buttons */
+    </style>
+    </head>
+<body>
+    <h1 class="header">Distributed Prime Computation - Control Panel</h1>
+    <div class="container">
+        <h2 class="section-title">Dashboard & Controls</h2>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            <button id="start-btn" class="btn btn-primary" disabled>Connecting...</button>
+            <button id="pause-resume-btn" class="btn btn-warning" disabled>Pause</button>
+            <button id="refresh-btn" class="btn btn-secondary">Refresh Page (F5)</button>
+            <button id="restart-btn" class="btn btn-danger">Restart Server</button>
+            <button id="clearStateBtn" class="btn btn-warning">Clear Previous Data</button>
+
+            </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div><strong>Status:</strong> <span id="computation-status">Idle</span></div>
+            <div><strong>Upper Limit (N):</strong> <span id="n-value">N/A</span></div>
+            <div><strong>Connected Workers:</strong> <span id="worker-count">0</span></div>
+            <div><strong>Tasks Completed:</strong> <span id="tasks-completed">0 / ${TOTAL_TASKS}</span></div>
+            <div><strong>Total Primes Found:</strong> <span id="running-total">0</span></div>
+            </div>
+        </div>
+    <div class="container">
+        <h2 class="section-title">Task Progress Overview</h2>
+        <div id="progress-container" class="progress-container"></div>
+        </div>
+    <div class="container">
+        <h2 class="section-title">Worker Management</h2>
+        <div class="overflow-x-auto">
+            <table id="workers-table">
+                <thead>
+                    <tr>
+                        <th>Full Worker ID</th>
+                        <th>IP Address</th>
+                        <th>Status</th>
+                        <th>Current Task</th>
+                        <th>Tasks Done</th>
+                        <th>Primes Found</th>
+                        <th>CPU Cores</th>
+                        <th>Memory Usage</th>
+                        <th>Browser/OS</th>
+                        <th>Actions</th>
+                        </tr>
+                </thead>
+                <tbody></tbody>
+                </table>
+        </div>
+        </div>
+    <div class="container">
+        <h2 class="section-title">Logs & Data Export</h2>
+        <div id="log" class="log-area"></div>
+        </div>
+    <script>
+        const startBtn = document.getElementById('start-btn'); // Retrieves the start button element by ID and assigns to constant. Why: For attaching event listeners and updating properties. How: getElementById returns the DOM node. Data: DOM reference.
+        const pauseResumeBtn = document.getElementById('pause-resume-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const logDiv = document.getElementById('log'); // Log area div.
+        const progressContainer = document.getElementById('progress-container'); // Progress grid container.
+        const tasksCompletedSpan = document.getElementById('tasks-completed'); // Span for completed tasks count.
+        const runningTotalSpan = document.getElementById('running-total'); // Span for total primes.
+        const nValueSpan = document.getElementById('n-value'); // Span for N value.
+        const workerCountSpan = document.getElementById('worker-count'); // Span for worker count.
+        const computationStatusSpan = document.getElementById('computation-status'); // Span for status.
+        const workersTableBody = document.querySelector('#workers-table tbody'); // Selects table body using CSS selector. Why: For dynamic row insertion. How: querySelector returns first matching element.
+
+        let TOTAL_TASKS = 0; // Global variable for total tasks count. Initialized to 0. Why: Tracks how many tasks in computation. Data: Integer, updated from server.
+        let N_VALUE = 0; // Upper limit N. Data: Integer.
+        let IS_RUNNING = false; // Boolean flag for computation state. Why: Controls button states and UI.
+        let runningTotal = 0n; // BigInt for total primes (uses n suffix for BigInt literal). Why: Primes count can be large; BigInt handles arbitrary size. Data: BigInt type.
+        const workerStats = new Map(); // Map to store worker info by ID. Why: Efficient key-value storage for quick lookups/updates. DSA: Map (hash table-like) for O(1) access. Data: Keys are worker IDs (strings), values are objects with worker details.
+        let socket; // Variable for WebSocket object. Why: For real-time communication with server.
+        // WebSocket URL constant. Why: Centralizes URL for easy updates. How: String constant for WebSocket connection. Data: URL string.
+        //const COORDINATOR_WS_URL = 'ws://localhost:8080';
+        // const COORDINATOR_WS_URL = 'ws://DESKTOP-NAF9NIA:8080';
+        const COORDINATOR_WS_URL = 'ws://91.99.238.128:8080';
+        
+        //const COORDINATOR_WS_URL = 'ws://192.168.0.113:8080'; // Local network IP for coordinator server. Why: Connects to the coordinator WebSocket server. Data: String URL; ws:// for non-secure WebSocket.
+        // const COORDINATOR_WS_URL = 'ws://192.168.1.108:8080'; // Constant for WebSocket URL. Why: Connects to coordinator server. Data: String URL; ws:// for non-secure WebSocket.
+
+        const log = (message) => { // Arrow function for logging. Parameters: message (string). Why: Appends messages to log div and scrolls to bottom.
+            logDiv.textContent += message + '\n'; // Appends message with newline to textContent. How: textContent for plain text manipulation. Data flow: Updates DOM directly.
+            logDiv.scrollTop = logDiv.scrollHeight; // Scrolls to bottom. Why: Keeps latest logs visible. How: Sets scrollTop to full height.
+        }; // Closing function. Control flow: Called throughout for logging events.
+
+        function updateWorkersTable() { // Function to refresh worker table. Why: Called on worker updates to rebuild table from workerStats Map.
+            workersTableBody.innerHTML = ''; // Clears existing rows by setting innerHTML to empty. Why: Resets table before repopulating to avoid duplicates.
+            workerStats.forEach((info, id) => { // Iterates over Map entries. Parameters: info (object), id (key). Why: Builds row for each worker. DSA: forEach on Map processes in insertion order.
+                const row = workersTableBody.insertRow(); // Inserts new table row. Returns the row element. How: DOM method to add <tr>.
+                const statusClass = info.status === 'Idle' ? 'text-green-500' : info.status === 'Busy' ? 'text-blue-500' : 'text-red-500'; // Ternary for status color class based on status string. Why: Visual cue; green idle, blue busy, red other.
+                
+                row.innerHTML = `
+                    <td>${id}</td>
+                    <td>${info.ipAddress || 'N/A'}</td>
+                    <td class="${statusClass}">${info.status || 'N/A'}</td>
+                    <td>${info.currentTask !== null ? `Task ${info.currentTask}` : 'N/A'}</td>
+                    <td>${info.stats?.tasksCompleted || 0}</td>
+                    <td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td>
+                    <td>${info.cpuCores || 'N/A'}</td>
+                    <td>${info.stats?.memory || 'N/A'}</td>
+                    <td>${info.browserInfo || 'Unknown'}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="terminateWorker('${id}')">Terminate</button></td>
+                `;
+            }); // Closing forEach.
+            workerCountSpan.textContent = workerStats.size; // Updates connected count with Map size.
+        } // Closing function. Control flow: Called on worker updates or full state.
+        
+        function terminateWorker(workerId) { // Made this a global function
+            if (confirm(`Are you sure you want to terminate worker ${workerId}?`)) {
+                socket.send(JSON.stringify({ type: 'terminateWorker', workerId: workerId }));
+            }
+        }
+
+        function buildProgressUI(results) { // Function to build task progress bars. Parameters: results (array or null). Why: Initializes or rebuilds grid based on server results.
+            progressContainer.innerHTML = ''; // Clears container.
+            runningTotal = 0n; // Resets total to 0 BigInt.
+            let totalCompleted = 0; // Local counter for completed tasks.
+
+            for (let i = 0; i < TOTAL_TASKS; i++) { // Loop from 0 to TOTAL_TASKS-1. Why: Creates one bar per task. Control flow: Iterative creation. DSA: Simple loop over index.
+                const bar = document.createElement('div'); // Creates div for bar.
+                bar.className = 'progress-bar'; // Applies class.
+                bar.id = `bar-${i}`; // Unique ID for later updates.
+                if (results && results[i] !== null) { // Checks if results exist and task i is done (not null).
+                    const count = BigInt(results[i]); // Converts result to BigInt.
+                    bar.style.backgroundColor = '#2ecc71'; // Sets green for done.
+                    bar.textContent = `Task ${i}: Done`; // Text update.
+                    runningTotal += count; // Adds to total.
+                    totalCompleted++; // Increments counter.
+                } else { // Else: Pending task.
+                    bar.textContent = `Task ${i}: Waiting`; // Text for waiting.
+                }
+                progressContainer.appendChild(bar); // Adds bar to container.
+            } // Closing loop.
+            tasksCompletedSpan.textContent = `${totalCompleted} / ${TOTAL_TASKS}`; // Updates completed span.
+            runningTotalSpan.textContent = runningTotal.toLocaleString(); // Updates total with localized string.
+        } // Closing function.
+        
+        function updateUIState() { // Function to sync UI with IS_RUNNING flag.
+            computationStatusSpan.textContent = IS_RUNNING ? 'Running' : 'Paused'; // Ternary for status text.
+            startBtn.disabled = IS_RUNNING; // Disables start if running.
+            
+            if (TOTAL_TASKS > 0) {
+                 pauseResumeBtn.disabled = false;
+            } else {
+                 pauseResumeBtn.disabled = true;
+            }
+
+            if (IS_RUNNING) {
+                pauseResumeBtn.textContent = 'Pause Computation';
+                pauseResumeBtn.classList.remove('btn-secondary');
+                pauseResumeBtn.classList.add('btn-warning');
+            } else {
+                pauseResumeBtn.textContent = 'Resume Computation';
+                pauseResumeBtn.classList.remove('btn-warning');
+                pauseResumeBtn.classList.add('btn-secondary');
+            }
+        } // Closing function. Why: Ensures buttons reflect state.
+
+        function connectDirectorSocket() { // Function to establish WebSocket connection. Why: Handles connection, reconnection, and event listeners.
+            log('Attempting to connect Director to coordinator...'); // Logs connection attempt.
+            socket = new WebSocket(COORDINATOR_WS_URL); // Creates WebSocket instance. Data flow: Opens connection to URL.
+
+            socket.onopen = () => { // Event handler for open. Why: Executes when connected.
+                log('✅ Connected. Registering as Director...'); // Log success.
+                socket.send(JSON.stringify({ type: 'registerDirector' })); // Sends registration message. Why: Identifies as director to server.
+                startBtn.disabled = false; // Enables buttons.
+                pauseResumeBtn.disabled = false;
+                startBtn.textContent = 'Start New Computation'; // Updates text.
+            }; // Closing onopen.
+
+            socket.onmessage = (event) => { // Handler for incoming messages. Parameters: event (with data).
+                const data = JSON.parse(event.data); // Parses JSON string to object. Why: Server sends JSON.
+                switch (data.type) { // Switch on message type. Control flow: Branches based on type string. Why: Handles different server messages.
+                    case 'log': // Server log message.
+                        log(data.message); // Appends to log.
+                        break; // Exits case.
+                    case 'fullState': // Full state sync.
+                        log('🔄 Received full state from server. Rebuilding UI...'); // Log.
+                        TOTAL_TASKS = data.totalTasks; // Updates global.
+                        N_VALUE = data.nValue;
+                        IS_RUNNING = data.isRunning;
+                        nValueSpan.textContent = N_VALUE.toLocaleString(); // Updates span.
+                        buildProgressUI(data.results); // Rebuilds progress.
+                        workerStats.clear(); // Clears Map.
+                        if (data.workers) { // If workers array provided.
+                           data.workers.forEach(([id, info]) => workerStats.set(id, info)); // Populates Map from array of [id, info]. DSA: forEach to insert into Map.
+                        }
+                        updateWorkersTable(); // Refreshes table.
+                        updateUIState(); // Syncs state.
+                        break;
+                    case 'progress': // Progress update for a task.
+                        const bar = document.getElementById(`bar-${data.taskId}`); // Gets specific bar.
+                        if (bar) { // If exists.
+                            bar.style.backgroundColor = '#2ecc71'; // Green.
+                            bar.textContent = `Task ${data.taskId}: Done`; // Text update.
+                        }
+                        const completedCount = data.totalCompleted; // From server.
+                        tasksCompletedSpan.textContent = `${completedCount} / ${TOTAL_TASKS}`; // Update.
+                        
+                        // Recalculate total primes to ensure accuracy
+                        runningTotal = 0n; // Reset.
+                        for(const [id, worker] of workerStats.entries()){ // Iterates Map entries. DSA: entries() iterator.
+                            runningTotal += BigInt(worker.stats.primesFound || 0); // Accumulates.
+                        }
+                        runningTotalSpan.textContent = runningTotal.toLocaleString(); // Update.
+                        break;
+                    case 'complete': // All tasks done.
+                        log(`\n🎉 ALL TASKS COMPLETE! Final Total: ${BigInt(data.totalPrimes).toLocaleString()}`); // Log with final count.
+                        IS_RUNNING = false; // Update flag.
+                        updateUIState(); // Sync.
+                        startBtn.textContent = 'Start New Computation'; // Reset text.
+                        break;
+                    case 'workerUpdate': // Worker info update.
+                        workerStats.set(data.workerId, data.workerInfo); // Sets in Map.
+                        updateWorkersTable(); // Refresh.
+                        break;
+                    case 'workerRemoved': // Worker removed.
+                        workerStats.delete(data.workerId); // Removes from Map.
+                        updateWorkersTable(); // Refresh.
+                        break;
+                } // Closing switch.
+            }; // Closing onmessage.
+
+            socket.onclose = () => { // Handler for close.
+                log('❌ Director disconnected. Reconnecting in 5 seconds...'); // Log.
+                startBtn.disabled = true; // Disable buttons.
+                pauseResumeBtn.disabled = true;
+                startBtn.textContent = 'Disconnected'; // Update text.
+                setTimeout(connectDirectorSocket, 5000); // Reconnects after 5s. Why: Auto-reconnect for reliability. How: setTimeout calls function again.
+            }; // Closing onclose.
+
+            socket.onerror = (error) => { // Handler for errors.
+                log('❌ Director WebSocket error. Check console.'); // Log.
+                socket.close(); // Closes socket.
+            }; // Closing onerror.
+
+        } // Closing connectDirectorSocket. Control flow: Called initially and on reconnect.
+
+        startBtn.onclick = () => { // Click handler for start.
+            if (confirm('This will clear all previous logs and results. Are you sure you want to start a new computation?')) { // Confirmation prompt.
+                log('Sending command to start new computation...'); // Log.
+                socket.send(JSON.stringify({ type: 'startComputation' })); // Sends start message.
+            }
+        }; // Closing onclick.
+        
+        pauseResumeBtn.onclick = () => { // Similar for resume.
+            const action = IS_RUNNING ? 'pauseComputation' : 'resumeComputation';
+            log(`Sending command to ${action}...`);
+            socket.send(JSON.stringify({ type: action }));
+        }; // Closing.
+
+        refreshBtn.onclick = () => {
+            log('Refreshing page...');
+            location.reload(true); // true forces a hard reload
+        }
+
+        restartBtn.onclick = () => {
+            if (confirm('Are you sure you want to restart the server? This will disconnect all clients.')) {
+                log('Sending command to restart the server...');
+                socket.send(JSON.stringify({ type: 'restartServer' }));
+            }
+        }
+
+        connectDirectorSocket(); // Initial call to connect. Why: Starts the application logic.
+    </script>
+    </body>
+</html>

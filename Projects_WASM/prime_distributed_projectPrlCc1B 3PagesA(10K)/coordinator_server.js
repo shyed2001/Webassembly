@@ -8,10 +8,9 @@ import { exec } from 'child_process'; // We still need exec for the restart comm
 
 
 // --- CONFIGURATION ---
-const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
-console.log('Coordinator server running on ws://0.0.0.0:8080');
-// const wss = new WebSocketServer({ port: 8080, host: '127.0.0.1', path: '/ws' });
-// console.log('Coordinator server running on ws://127.0.0.1:8080/ws');
+// const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
+const wss = new WebSocketServer({ port: 8080, host: '127.0.0.1', path: '/ws' });
+console.log('Coordinator server running on ws://127.0.0.1:8080/ws');
 // console.log('Coordinator server running on ws://0.0.0.0:8080  ', wss.options.host, wss.options.port);
 // console.log('Coordinator server running on ws://192.168.1.108:8080');
  // WiFi 192.168.0.113

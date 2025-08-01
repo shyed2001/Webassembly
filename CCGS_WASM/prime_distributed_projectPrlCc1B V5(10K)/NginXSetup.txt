@@ -1,0 +1,356 @@
+ccgsc-user1@shyed2001Vps:~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)$ cd /etc/nginx/sites-available
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ ls -la
+total 16
+drwxr-xr-x 2 root root 4096 Jul 31 22:29 .
+drwxr-xr-x 8 root root 4096 Jul 31 19:27 ..
+-rw-r--r-- 1 root root 2412 May 30  2023 default
+-rw-r--r-- 1 root root 3080 Aug  1 11:47 prime-distributor
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cat prime-distributor
+# Server Block for the Director Interface
+server {
+    server_name ccgsc-director.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index director.html;
+
+    # Listen on port 443 for SSL connections
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+    # Main location block
+    location / {
+        # First, try to find a static file. If not found, pass to the @proxy location.
+        try_files $uri $uri/ @proxy;
+    }
+
+    # Named location for proxying to Node.js
+    location @proxy {
+        proxy_pass http://127.0.0.1:8080; # Your Node.js app
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    # --- ADD THESE TWO LINES ---
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    }
+}
+
+# Server Block for the Worker Interface
+server {
+    server_name ccgsc-demo.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index worker.html;
+
+    # Listen on port 443 for SSL connections
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+    # Main location block
+    location / {
+        # First, try to find a static file. If not found, pass to the @proxy location.
+        try_files $uri $uri/ @proxy;
+    }
+
+    # Named location for proxying to Node.js
+    location @proxy {
+        proxy_pass http://127.0.0.1:8080; # Your Node.js app
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    # --- ADD THESE TWO LINES ---
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+
+# HTTP to HTTPS redirects (managed by Certbot, no changes needed here)
+server {
+    if ($host = ccgsc-demo.digitalbd.org) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name ccgsc-demo.digitalbd.org;
+    return 404;
+}
+server {
+    if ($host = ccgsc-director.digitalbd.org) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name ccgsc-director.digitalbd.org;
+    return 404;
+}
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cat default
+##
+# You should look at the following URL's in order to grasp a solid understanding
+# of Nginx configuration files in order to fully unleash the power of Nginx.
+# https://www.nginx.com/resources/wiki/start/
+# https://www.nginx.com/resources/wiki/start/topics/tutorials/config_pitfalls/
+# https://wiki.debian.org/Nginx/DirectoryStructure
+#
+# In most cases, administrators will remove this file from sites-enabled/ and
+# leave it as reference inside of sites-available where it will continue to be
+# updated by the nginx packaging team.
+#
+# This file will automatically load configuration files provided by other
+# applications, such as Drupal or Wordpress. These applications will be made
+# available underneath a path with that package name, such as /drupal8.
+#
+# Please see /usr/share/doc/nginx-doc/examples/ for more detailed examples.
+##
+
+# Default server configuration
+#
+server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+
+        # SSL configuration
+        #
+        # listen 443 ssl default_server;
+        # listen [::]:443 ssl default_server;
+        #
+        # Note: You should disable gzip for SSL traffic.
+        # See: https://bugs.debian.org/773332
+        #
+        # Read up on ssl_ciphers to ensure a secure configuration.
+        # See: https://bugs.debian.org/765782
+        #
+        # Self signed certs generated by the ssl-cert package
+        # Don't use them in a production server!
+        #
+        # include snippets/snakeoil.conf;
+
+        root /var/www/html;
+
+        # Add index.php to the list if you are using PHP
+        index index.html index.htm index.nginx-debian.html;
+
+        server_name _;
+
+        location / {
+                # First attempt to serve request as file, then
+                # as directory, then fall back to displaying a 404.
+                try_files $uri $uri/ =404;
+        }
+
+        # pass PHP scripts to FastCGI server
+        #
+        #location ~ \.php$ {
+        #       include snippets/fastcgi-php.conf;
+        #
+        #       # With php-fpm (or other unix sockets):
+        #       fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+        #       # With php-cgi (or other tcp sockets):
+        #       fastcgi_pass 127.0.0.1:9000;
+        #}
+
+        # deny access to .htaccess files, if Apache's document root
+        # concurs with nginx's one
+        #
+        #location ~ /\.ht {
+        #       deny all;
+        #}
+}
+
+
+# Virtual Host configuration for example.com
+#
+# You can move that to a different file under sites-available/ and symlink that
+# to sites-enabled/ to enable it.
+#
+#server {
+#       listen 80;
+#       listen [::]:80;
+#
+#       server_name example.com;
+#
+#       root /var/www/example.com;
+#       index index.html;
+#
+#       location / {
+#               try_files $uri $uri/ =404;
+#       }
+#}
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ sudo nano /etc/nginx/sites-available/prime-distributor
+[sudo] password for ccgsc-user1:
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cd "CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)"
+-bash: cd: CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K): No such file or directory
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cd "CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)"
+-bash: cd: CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K): No such file or directory
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cd CCGSC/PA10KT2/"prime_distributed_proj
+ectPrlCc1B V5(10K)"
+-bash: cd: CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K): No such file or directory
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cd ../..
+ccgsc-user1@shyed2001Vps:/etc$ cd ..
+ccgsc-user1@shyed2001Vps:/$ ls
+bin   cdrom  etc             home  lib32  libx32      media  opt   root  sbin  srv  tmp  var
+boot  dev    Everything.txt  lib   lib64  lost+found  mnt    proc  run   snap  sys  usr
+ccgsc-user1@shyed2001Vps:/$ cd home
+ccgsc-user1@shyed2001Vps:/home$ ls
+ccgsc-user1
+ccgsc-user1@shyed2001Vps:/home$ cd CCGSC/PA10KT2/"prime_distributed_projectPrlCc1B V5(10K)"
+-bash: cd: CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K): No such file or directory
+ccgsc-user1@shyed2001Vps:/home$ cd ccgsc-user1/
+ccgsc-user1@shyed2001Vps:~$ cd CCGSC/PA10KT2/"prime_distributed_projectPrlCc1B V5(10K)"
+ccgsc-user1@shyed2001Vps:~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)$ sudo nginx -t
+sudo systemctl reload nginx
+sudo systemctl restart nginx
+sudo ufw allow 'Nginx Full'
+sudo pm2 stop all && pm2 kill && pm2 delete all
+sudo pm2 restart coordinator
+sudo pm2 save
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Skipping adding existing rule
+Skipping adding existing rule (v6)
+[PM2] Applying action stopProcessId on app [all](ids: [ 0, 1, 2 ])
+[PM2] [coordinator](1) ✓
+[PM2] [coordinator](0) ✓
+[PM2] [coordinator](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ coordinator        │ cluster  │ 5    │ stopped   │ 0%       │ 0b       │
+│ 1  │ coordinator        │ cluster  │ 5    │ stopped   │ 0%       │ 0b       │
+│ 2  │ coordinator        │ cluster  │ 1    │ stopped   │ 0%       │ 0b       │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] No process found
+[PM2] [v] All Applications Stopped
+[PM2] [v] PM2 Daemon Stopped
+[PM2] Spawning PM2 daemon with pm2_home=/home/ccgsc-user1/.pm2
+[PM2] PM2 Successfully daemonized
+[PM2][WARN] No process found
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [coordinator](ids: [ 0, 1, 2 ])
+[PM2] [coordinator](1) ✓
+[PM2] [coordinator](0) ✓
+[PM2] [coordinator](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ coordinator        │ cluster  │ 5    │ online    │ 0%       │ 45.8mb   │
+│ 1  │ coordinator        │ cluster  │ 5    │ online    │ 0%       │ 47.5mb   │
+│ 2  │ coordinator        │ cluster  │ 1    │ online    │ 0%       │ 37.7mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+ccgsc-user1@shyed2001Vps:~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)$ sudo pm2 list
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ coordinator        │ cluster  │ 5    │ online    │ 0%       │ 53.7mb   │
+│ 1  │ coordinator        │ cluster  │ 5    │ online    │ 0%       │ 57.1mb   │
+│ 2  │ coordinator        │ cluster  │ 1    │ online    │ 0%       │ 57.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+ccgsc-user1@shyed2001Vps:~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)$ sudo pm2 log
+[TAILING] Tailing last 15 lines for [all] processes (change the value with --lines option)
+/root/.pm2/pm2.log last 15 lines:
+PM2        | 2025-08-01T17:52:48: PM2 log: App [coordinator:0] exited with code [0] via signal [SIGINT]
+PM2        | 2025-08-01T17:52:48: PM2 log: App name:coordinator id:1 disconnected
+PM2        | 2025-08-01T17:52:48: PM2 log: App [coordinator:1] exited with code [0] via signal [SIGINT]
+PM2        | 2025-08-01T17:52:48: PM2 log: pid=8806 msg=process killed
+PM2        | 2025-08-01T17:52:48: PM2 log: pid=8800 msg=process killed
+PM2        | 2025-08-01T17:52:48: PM2 log: Stopping app:coordinator id:2
+PM2        | 2025-08-01T17:52:48: PM2 log: App name:coordinator id:2 disconnected
+PM2        | 2025-08-01T17:52:48: PM2 log: App [coordinator:2] exited with code [0] via signal [SIGINT]
+PM2        | 2025-08-01T17:52:48: PM2 log: pid=8707 msg=process killed
+PM2        | 2025-08-01T17:52:49: PM2 log: App [coordinator:0] starting in -cluster mode-
+PM2        | 2025-08-01T17:52:49: PM2 log: App [coordinator:1] starting in -cluster mode-
+PM2        | 2025-08-01T17:52:49: PM2 log: App [coordinator:1] online
+PM2        | 2025-08-01T17:52:49: PM2 log: App [coordinator:2] starting in -cluster mode-
+PM2        | 2025-08-01T17:52:49: PM2 log: App [coordinator:0] online
+PM2        | 2025-08-01T17:52:49: PM2 log: App [coordinator:2] online
+
+/var/log/coordinator/error-0.log last 15 lines:
+/var/log/coordinator/error-2.log last 15 lines:
+/var/log/coordinator/error-1.log last 15 lines:
+1|coordina |     at Object.<anonymous> (/usr/local/lib/node_modules/pm2/lib/binaries/CLI.js:27:11)
+1|coordina |     at Module._compile (node:internal/modules/cjs/loader:1529:14)
+1|coordina |     at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+1|coordina |     at Module.load (node:internal/modules/cjs/loader:1275:32)
+1|coordina |     at Module._load (node:internal/modules/cjs/loader:1096:12)
+1|coordina | /usr/local/lib/node_modules/pm2/node_modules/@pm2/agent/src/InteractorClient.js:58
+1|coordina |           if (stats.uid === 0) {
+1|coordina |                     ^
+1|coordina |
+1|coordina | TypeError: Cannot read properties of undefined (reading 'uid')
+1|coordina |     at /usr/local/lib/node_modules/pm2/node_modules/@pm2/agent/src/InteractorClient.js:58:21
+1|coordina |     at FSReqCallback.oncomplete (node:fs:198:21)
+1|coordina |
+1|coordina | Node.js v20.19.4
+1|coordina |
+
+/var/log/coordinator/out-0.log last 15 lines:
+0|coordina | Coordinator server running on ws://127.0.0.1:8080/ws
+0|coordina | [State] Computation state loaded from /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/computation_state.json
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdsx4wcogcx0kb9o6el","browserInfo":"Chrome on Windows","cpuCores":4}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdsx5hjedt6yj6biebj","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdsukz7fq8pvq4rly6","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdsx4anh9qvgeqajc16","browserInfo":"Chrome on Android","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt1ts78cfa9wx2xe8b","browserInfo":"Chrome on Android","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt1us4ppnbetdkezn8","browserInfo":"Chrome on Windows","cpuCores":4}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt1vjnwq3jyct0ausr","browserInfo":"Chrome on Windows","cpuCores":4}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt1s36teyhw9y4cfoa","browserInfo":"Chrome on Android","cpuCores":8}
+0|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt1s36teyhw9y4cfoa
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt2a6uida8mmjpkid5","browserInfo":"Chrome on Android","cpuCores":8}
+0|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt2a6uida8mmjpkid5
+0|coordina | Coordinator server running on ws://127.0.0.1:8080/ws
+0|coordina | [State] Computation state loaded from /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/computation_state.json
+
+/var/log/coordinator/out-1.log last 15 lines:
+1|coordina | [State] Deleted computation_state.json by director's command.
+1|coordina | [Coordinator] Task queue initialized.
+1|coordina | Director disconnected.
+1|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt1s36teyhw9y4cfoa","browserInfo":"Chrome on Android","cpuCores":8}
+1|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdsx6d7ev5k1cgmylwa","browserInfo":"Chrome on Android","cpuCores":8}
+1|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt1vrkugjf0m0lkp0m","browserInfo":"Firefox on Windows","cpuCores":8}
+1|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt1s36teyhw9y4cfoa
+1|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt22hiclaf8nf4yny","browserInfo":"Chrome on Android","cpuCores":8}
+1|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt22hiclaf8nf4yny
+1|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt2a1ao8k5qckgegev","browserInfo":"Chrome on Android","cpuCores":8}
+1|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt2a6uida8mmjpkid5","browserInfo":"Chrome on Android","cpuCores":8}
+1|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt2a6uida8mmjpkid5
+1|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt2a1ao8k5qckgegev
+1|coordina | Coordinator server running on ws://127.0.0.1:8080/ws
+1|coordina | [State] Computation state loaded from /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/computation_state.json
+
+/var/log/coordinator/out-2.log last 15 lines:
+2|coordina | [Debug] Received message: {"type":"stillWorking","workerId":"worker-mdsx5a635ppw2jcikbj","taskId":9999}
+2|coordina | [Debug] Received message: {"type":"result","workerId":"worker-mdsx5a635ppw2jcikbj","taskId":9999,"count":"4832"}
+2|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt22e1cgi8sv5rpo7a","browserInfo":"Chrome on Android","cpuCores":8}
+2|coordina | Director disconnected.
+2|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt29w28earj2ol89rv","browserInfo":"Chrome on Android","cpuCores":8}
+2|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt29w28earj2ol89rv
+2|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdt2a1ao8k5qckgegev","browserInfo":"Chrome on Android","cpuCores":8}
+2|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdt2a1ao8k5qckgegev
+2|coordina | [Debug] Received message: {"type":"registerDirector"}
+2|coordina | [Debug] Received message: {"type":"clearState"}
+2|coordina | [State] Deleted computation_state.json by director's command.
+2|coordina | [Coordinator] Task queue initialized.
+2|coordina | Director disconnected.
+2|coordina | Coordinator server running on ws://127.0.0.1:8080/ws
+2|coordina | [State] Computation state loaded from /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/computation_state.json
+
+^C
+ccgsc-user1@shyed2001Vps:~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)$ sudo pm2 kill
+pm2 kill
+[PM2] Applying action deleteProcessId on app [all](ids: [ 0, 1, 2 ])
+[PM2] [coordinator](1) ✓
+[PM2] [coordinator](2) ✓
+[PM2] [coordinator](0) ✓
+[PM2] [v] All Applications Stopped
+[PM2] [v] PM2 Daemon Stopped
+[PM2][WARN] No process found
+[PM2] [v] All Applications Stopped
+[PM2] [v] PM2 Daemon Stopped
