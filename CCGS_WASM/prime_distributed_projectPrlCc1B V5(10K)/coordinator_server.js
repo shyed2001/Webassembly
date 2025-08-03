@@ -1,10 +1,13 @@
 // In: prime_distributed_projectPrlCc1B V5(10K)/coordinator_server.js
 // FINAL VERSION: Includes CSV logging, worker control, and enhanced state management.
 
+// In: prime_distributed_projectPrlCc1B V5(10K)/coordinator_server.js
+
+// Add Node.js 'cluster' module at the top
 import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process'; // We still need exec for the restart command
+import { exec } from 'child_process';// We still need exec for the restart command
 
 
 // --- CONFIGURATION ---

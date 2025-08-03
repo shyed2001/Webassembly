@@ -9,8 +9,8 @@ module.exports = {
     user      : "www-data",
     
     // These lines enable cluster mode for full parallelism
-    instances : "max",
-    exec_mode : "cluster",
+    //instances : "max",
+    // exec_mode : "cluster",
     // --- ADD THESE LINES TO SPECIFY LOG PATHS ---
     output    : "/var/log/coordinator/out.log",
     error     : "/var/log/coordinator/error.log",
@@ -20,7 +20,7 @@ module.exports = {
   }]
 }
 
-
+/*
 /*
 module.exports = {
   apps : [{
@@ -50,3 +50,5 @@ module.exports = {
   }]
 }
   */
+// Note: The above configuration is for a Node.js application using PM2.
+// It includes settings for the coordinator server, such as script path, user, and environment variables
