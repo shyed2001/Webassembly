@@ -123,8 +123,8 @@ It includes buttons to start, pause, resume, and restart the computation, as wel
 
             function connectWebSocket() {
                 //const socket = new WebSocket('ws://91.99.238.128:8080'); // Your WebSocket URL
-               // const socket = new WebSocket('wss://ccgsc-demo.digitalbd.org/ws'); // Your WebSocket URL
-const socket = new WebSocket('ws://ccgsc-demo.digitalbd.org/ws'); // Your WebSocket URL
+            const socket = new WebSocket('wss://ccgsc-director.digitalbd.org/ws'); // Your WebSocket URL
+// const socket = new WebSocket('ws://ccgsc-director.digitalbd.org/ws'); // Your WebSocket URL
                 elements.startBtn.textContent = 'Connecting...';
                 
                 socket.onopen = () => {

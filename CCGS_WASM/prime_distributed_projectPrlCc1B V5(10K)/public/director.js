@@ -30,8 +30,8 @@ const log = (message) => {
 // const socket = new WebSocket('ws://DESKTOP-NAF9NIA:8080');
  // const socket = new WebSocket('ws://91.99.238.128:8080');
  //  const socket = new WebSocket('wss://ccgsc-director.digitalbd.org/ws'); // Your server URL
- // const socket = new WebSocket('wss://ccgsc-director.digitalbd.org/ws'); // Your server URL
-const socket = new WebSocket('ws://ccgsc-director.digitalbd.org/ws'); // Your server URL
+ const socket = new WebSocket('wss://ccgsc-director.digitalbd.org/ws'); // Your server URL
+// const socket = new WebSocket('ws://ccgsc-director.digitalbd.org/ws'); // Your server URL
 socket.onopen = () => {
     log('✅ Connected. Registering as Director...');
     socket.send(JSON.stringify({ type: 'registerDirector' }));

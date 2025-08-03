@@ -12,8 +12,8 @@ module.exports = {
     instances : "max",
     exec_mode : "cluster",
     // --- ADD THESE LINES TO SPECIFY LOG PATHS ---
-    // output    : "/var/log/coordinator/out.log",
-    // error     : "/var/log/coordinator/error.log",
+    output    : "/var/log/coordinator/out.log",
+    error     : "/var/log/coordinator/error.log",
     env       : {
       NODE_ENV: "production", 
     }
