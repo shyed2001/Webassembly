@@ -19,7 +19,7 @@ cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
 sudo lsof -i :8080
 sleep 3
 sudo netstat -tulpn | grep 8080
-
+sleep 3
 
 sudo systemctl restart nginx
 sleep 3
@@ -29,7 +29,6 @@ sudo systemctl reload nginx
 sleep 3
 sudo ufw allow 'Nginx Full'
 sleep 3
-
 sudo pm2 stop all && pm2 kill && pm2 delete all && pm2 flush 
 sleep 5
 pm2 stop all && pm2 kill && pm2 delete all && pm2 flush
@@ -45,6 +44,10 @@ sleep 3
 sudo pm2 list
 sleep 7
 sudo pm2 log
+
+
+
+
 
 sudo pm2 start ecosystem.config.cjs --only coordinator 
 sudo pm2 restart coordinator
