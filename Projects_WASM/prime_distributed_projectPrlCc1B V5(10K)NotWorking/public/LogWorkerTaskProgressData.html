@@ -24,18 +24,16 @@ It uses IndexedDB to fetch logs and updates the UI dynamically.
             const channel = new BroadcastChannel('computation_channel');
             let db;
 
-            const request = indexedDB.open(DB_NAME);
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                loadLogs();
-            };
-            request.onerror = (e) => console.error("DB Error on logs page:", e.target.errorCode);
+            function initDB() {
+                const request = indexedDB.open(DB_NAME);
+                request.onsuccess = e => {
+                    db = e.target.result;
+                    loadLogs();
+                };
+            }
 
-
-            channel.onmessage = () => {
-                loadLogs();
-            };
-
+            channel.onmessage = () => loadLogs();
+            
             function loadLogs() {
                 if (!db) return;
                 const tx = db.transaction('logs', 'readonly');
@@ -43,10 +41,16 @@ It uses IndexedDB to fetch logs and updates the UI dynamically.
                 const logRequest = store.getAll();
 
                 logRequest.onsuccess = () => {
-                    logArea.textContent = logRequest.result.join('\n');
+                    if (logRequest.result.length > 0) {
+                        logArea.textContent = logRequest.result.join('\n');
+                    } else {
+                        logArea.textContent = 'No logs recorded. Open the main director dashboard to begin.';
+                    }
                     window.scrollTo(0, document.body.scrollHeight);
                 };
             }
+            
+            initDB();
         });
     </script>
 </body>

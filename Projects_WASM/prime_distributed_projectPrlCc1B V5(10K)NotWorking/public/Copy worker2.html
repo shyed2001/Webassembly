@@ -1,0 +1,124 @@
+<!-- 
+file: prime_distributed_projectPrlCc1B V5(10K)/public/worker.html
+This file is part of the CCGS WebAssembly project.   
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Computation Worker Node</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>/* Your existing worker styles are fine */</style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">Computation Worker Node</h1>
+        <p class="mb-2">Your unique Worker ID:</p>
+        <p id="worker-id" class="worker-id mb-6">Initializing...</p>
+        <p class="mb-2">Current Status:</p>
+        <p id="status" class="status-text text-blue-500">Starting...</p>
+        <div class="mt-4 text-sm text-gray-500">
+            <p>This page must remain open to contribute.</p>
+            <p><strong>Tasks completed by this worker:</strong> <span id="tasks-completed-count">0</span></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { getClientInfo } from './stats.js';
+        const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws';
+        // ... The rest of the fully persistent worker script from the previous answer goes here.
+        // This script includes IndexedDB for storing task history and LocalStorage for the worker ID.
+
+        const DB_NAME = 'WorkerDB';
+        const DB_VERSION = 1;
+        let db, workerSocket;
+
+        const statusDiv = document.getElementById('status');
+        const myWorkerIdSpan = document.getElementById('worker-id');
+        const tasksCompletedSpan = document.getElementById('tasks-completed-count');
+        const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+
+        function getOrSetWorkerId() {
+            let id = localStorage.getItem('myWorkerId');
+            if (!id) {
+                id = `worker-${Math.random().toString(36).substring(2, 16)}`;
+                localStorage.setItem('myWorkerId', id);
+            }
+            return id;
+        }
+
+        const myWorkerId = getOrSetWorkerId();
+        myWorkerIdSpan.textContent = myWorkerId;
+
+        function initDB() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = e => {
+                if (!e.target.result.objectStoreNames.contains('completedTasks')) {
+                    e.target.result.createObjectStore('completedTasks', { keyPath: 'taskId' });
+                }
+            };
+            request.onerror = e => console.error('DB Error:', e.target.errorCode);
+            request.onsuccess = e => {
+                db = e.target.result;
+                updateCompletedCount();
+                connectWorkerSocket();
+            };
+        }
+
+        computationWorker.onmessage = (event) => {
+            const data = event.data;
+            if (data.type === 'result') {
+                statusDiv.textContent = `✅ Task #${data.taskId} complete.`;
+                if(db) {
+                    const tx = db.transaction('completedTasks', 'readwrite');
+                    tx.objectStore('completedTasks').put({ taskId: data.taskId, count: data.count });
+                    tx.oncomplete = () => updateCompletedCount();
+                }
+            }
+            // Forward all messages to the main server
+            if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
+                workerSocket.send(JSON.stringify({ workerId: myWorkerId, ...data }));
+            }
+        };
+        
+        function connectWorkerSocket() {
+            statusDiv.textContent = 'Connecting...';
+            workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
+
+            workerSocket.onopen = () => {
+                statusDiv.textContent = '✅ Connected. Awaiting tasks.';
+                const clientInfo = getClientInfo();
+                workerSocket.send(JSON.stringify({ 
+                    type: 'registerWorker', 
+                    workerId: myWorkerId, 
+                    browserInfo: clientInfo.browserInfo,
+                    cpuCores: clientInfo.cpuCores
+                }));
+            };
+
+            workerSocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'task') {
+                    statusDiv.textContent = `Computing task #${data.task.taskId}...`;
+                    computationWorker.postMessage({ task: data.task });
+                }
+            };
+
+            workerSocket.onclose = () => {
+                statusDiv.textContent = '❌ Disconnected. Reconnecting...';
+                setTimeout(connectWorkerSocket, 5000);
+            };
+        }
+
+        function updateCompletedCount() {
+            if (!db) return;
+            const countRequest = db.transaction('completedTasks', 'readonly').objectStore('completedTasks').count();
+            countRequest.onsuccess = () => {
+                tasksCompletedSpan.textContent = countRequest.result;
+            };
+        }
+
+        initDB();
+    </script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Prime Computation - Worker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #333; }
+        .container { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+        .header { font-size: 1.8rem; font-weight: 700; color: #2c3e50; }
+        .section-title { font-size: 1.25rem; font-weight: 600; color: #34495e; border-bottom: 2px solid #ecf0f1; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="container text-center p-8 max-w-lg w-full">
+        <h1 class="header mb-4">Prime Computation Worker</h1>
+        <div class="p-6 border-2 border-dashed border-gray-300 rounded-lg">
+            <h2 class="section-title pb-2 mb-4">Worker Status</h2>
+            <p class="text-gray-600"><strong>Worker ID:</strong> <span id="worker-id" class="font-mono bg-gray-200 px-2 py-1 rounded">N/A</span></p>
+            <p id="status" class="text-lg font-semibold my-4 p-3 bg-gray-100 rounded-md text-gray-700">Initializing...</p>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <div class="p-4 bg-blue-50 rounded-lg">
+                    <p class="text-sm font-medium text-blue-800">Tasks Completed</p>
+                    <p id="tasks-completed" class="text-2xl font-bold text-blue-900">0</p>
+                </div>
+                <div class="p-4 bg-green-50 rounded-lg">
+                    <p class="text-sm font-medium text-green-800">Total Primes Found</p>
+                    <p id="primes-found" class="text-2xl font-bold text-green-900">0</p>
+                </div>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-4">This page must remain open to contribute processing power.</p>
+    </div>
+
+    <script type="module">
+        import { getClientInfo } from './stats.js';
+
+        const elements = {
+            status: document.getElementById('status'),
+            workerId: document.getElementById('worker-id'),
+            tasksCompleted: document.getElementById('tasks-completed'),
+            primesFound: document.getElementById('primes-found'),
+        };
+
+        const DB_NAME = 'WorkerDB';
+        const DB_VERSION = 1;
+        const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws';
+
+        let db;
+        let workerSocket;
+        const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+
+        function getOrSetWorkerId() {
+            let id = localStorage.getItem('myWorkerId');
+            if (!id) {
+                id = `worker-${Math.random().toString(36).substring(2, 16)}`;
+                localStorage.setItem('myWorkerId', id);
+            }
+            return id;
+        }
+
+        const myWorkerId = getOrSetWorkerId();
+        elements.workerId.textContent = myWorkerId;
+
+        function initDB() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = e => {
+                const dbInstance = e.target.result;
+                if (!dbInstance.objectStoreNames.contains('completedTasks')) {
+                    dbInstance.createObjectStore('completedTasks', { keyPath: 'taskId' });
+                }
+            };
+            request.onerror = e => console.error('DB Error:', e.target.errorCode);
+            request.onsuccess = e => {
+                db = e.target.result;
+                updateStatsFromDB();
+                connectWorkerSocket();
+            };
+        }
+        
+        // This is the message handler for the BACKGROUND worker thread
+        computationWorker.onmessage = (event) => {
+            const data = event.data;
+            
+            // --- THIS IS THE CRITICAL FIX ---
+            // Update the UI with status messages from the background thread
+            if (data.type === 'status') {
+                elements.status.textContent = data.message;
+            }
+            // --- END OF FIX ---
+
+            // Always forward the message to the server
+            if (workerSocket?.readyState === WebSocket.OPEN) {
+                workerSocket.send(JSON.stringify({ workerId: myWorkerId, ...data }));
+            }
+            
+            // Handle saving the result locally
+            if (data.type === 'result') {
+                elements.status.textContent = `✅ Task #${data.taskId} complete.`;
+                if(db) {
+                    const tx = db.transaction('completedTasks', 'readwrite');
+                    tx.objectStore('completedTasks').put({ taskId: data.taskId, count: data.count });
+                    tx.oncomplete = () => updateStatsFromDB();
+                }
+            } else if (data.type === 'error') {
+                 elements.status.textContent = `❌ Error on task #${data.taskId}.`;
+            }
+        };
+        
+        function connectWorkerSocket() {
+            elements.status.textContent = 'Connecting to coordinator...';
+            workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
+
+            workerSocket.onopen = () => {
+                elements.status.textContent = '✅ Connected. Awaiting tasks.';
+                const clientInfo = getClientInfo();
+                workerSocket.send(JSON.stringify({ 
+                    type: 'registerWorker', 
+                    workerId: myWorkerId, 
+                    browserInfo: clientInfo.browserInfo,
+                    cpuCores: clientInfo.cpuCores
+                }));
+            };
+
+            workerSocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'task') {
+                    elements.status.textContent = `Computing task #${data.task.taskId}...`;
+                    computationWorker.postMessage({ task: data.task });
+                }
+            };
+
+            workerSocket.onclose = () => {
+                elements.status.textContent = '❌ Disconnected. Reconnecting...';
+                setTimeout(connectWorkerSocket, 5000);
+            };
+        }
+
+        function updateStatsFromDB() {
+            if (!db) return;
+            const tx = db.transaction('completedTasks', 'readonly');
+            const store = tx.objectStore('completedTasks');
+            
+            const countRequest = store.count();
+            countRequest.onsuccess = () => {
+                elements.tasksCompleted.textContent = countRequest.result.toLocaleString();
+            };
+
+            const getAllRequest = store.getAll();
+            getAllRequest.onsuccess = () => {
+                const totalPrimes = getAllRequest.result.reduce((sum, task) => sum + BigInt(task.count), 0n);
+                elements.primesFound.textContent = totalPrimes.toLocaleString();
+            };
+        }
+
+        initDB();
+    </script>
+</body>
+</html>

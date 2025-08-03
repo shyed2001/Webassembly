@@ -7,10 +7,29 @@ import path from 'path';
 import { exec } from 'child_process'; // We still need exec for the restart command
 
 
+// --- MODULES ---
+// WebSocketServer: For handling WebSocket connections.
 // --- CONFIGURATION ---
-// const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
-const wss = new WebSocketServer({ port: 8080, host: '127.0.0.1', path: '/ws' });
-console.log('Coordinator server running on ws://127.0.0.1:8080/ws');
+//const PORT = 8080; 
+// const PORT = parseInt(process.env.PORT, 10) || 8080;
+const PORT = parseInt(process.env.PORT, 10) || 8088; // Default port for the WebSocket server. Why: Configurable for flexibility. Data: Integer value.
+// HOST: Host address for the WebSocket server. Why: To specify the server's address
+// const HOST = process.env.HOST || '127.0.0.1';  
+const HOST = process.env.HOST || '0.0.0.0';  
+const wss = new WebSocketServer({ port: PORT, host: HOST });
+console.log(`Coordinator server running on port ${PORT}`);
+// PORT: Port number for the WebSocket server. Why: Configurable for flexibility. Data: Integer value.
+//const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
+//const wss = new WebSocketServer({ port: PORT, host: '127.0.0.1' });
+//const HOST = '127.0.0.1';
+
+// wss: WebSocket server instance. Why: To handle incoming WebSocket connections. Data: WebSocketServer instance.
+// wss.options.host: Host address for the WebSocket server. Why: To specify the server's address. Data: String value.
+// wss.options.port: Port number for the WebSocket server. Why: To specify the server's port. Data: Integer value.
+// wss.options.path: Path for the WebSocket server. Why: To specify the server's path. Data: String value.
+
+// const wss = new WebSocketServer({ port: 8080, host: '127.0.0.1', path: '/ws' });
+// console.log('Coordinator server running on ws://127.0.0.1:8080/ws');
 // console.log('Coordinator server running on ws://0.0.0.0:8080  ', wss.options.host, wss.options.port);
 // console.log('Coordinator server running on ws://192.168.1.108:8080');
  // WiFi 192.168.0.113
@@ -276,8 +295,8 @@ wss.on('connection', (ws, req) => {
             case 'restartServer':
                 logToDirector('🔄 Server restart initiated...');
                 // Use PM2's programmatic restart command
-//exec('pm2 restart coordinator', (error, stdout, stderr) => {
- exec('sudo pm2 restart coordinator', (error, stdout, stderr) => {                   
+exec('pm2 restart coordinator', (error, stdout, stderr) => {
+                
                     if (error) {
                         console.error(`exec error: ${error}`);
                         logToDirector(`Error restarting server: ${error.message}`);

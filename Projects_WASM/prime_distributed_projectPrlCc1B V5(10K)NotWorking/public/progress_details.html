@@ -4,7 +4,6 @@ This file is part of the Distributed Prime Computation project.
 This HTML file displays the detailed progress of tasks in a grid format.
 It uses IndexedDB to fetch task results and updates the UI dynamically.
  -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,17 +27,16 @@ It uses IndexedDB to fetch task results and updates the UI dynamically.
             const channel = new BroadcastChannel('computation_channel');
             let db;
 
-            const request = indexedDB.open(DB_NAME);
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                loadAndRenderGrid();
-            };
-            request.onerror = (e) => console.error("DB Error on details page:", e.target.errorCode);
+            function initDB() {
+                const request = indexedDB.open(DB_NAME);
+                request.onsuccess = e => {
+                    db = e.target.result;
+                    loadAndRenderGrid();
+                };
+            }
 
-            channel.onmessage = () => {
-                loadAndRenderGrid();
-            };
-
+            channel.onmessage = () => loadAndRenderGrid();
+            
             function loadAndRenderGrid() {
                 if (!db) return;
                 const tx = db.transaction('state', 'readonly');
@@ -47,7 +45,10 @@ It uses IndexedDB to fetch task results and updates the UI dynamically.
 
                 stateRequest.onsuccess = () => {
                     const state = stateRequest.result;
-                    if (!state || !state.results) return;
+                    if (!state || !state.results) {
+                        progressContainer.innerHTML = '<p style="text-align:center; color: #555;">No data available. Open the main director dashboard to begin.</p>';
+                        return;
+                    }
 
                     const fragment = document.createDocumentFragment();
                     state.results.forEach((result, i) => {
@@ -65,6 +66,8 @@ It uses IndexedDB to fetch task results and updates the UI dynamically.
                     progressContainer.appendChild(fragment);
                 };
             }
+
+            initDB();
         });
     </script>
 </body>

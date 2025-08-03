@@ -6,7 +6,8 @@ drwxr-xr-x 8 root root 4096 Jul 31 19:27 ..
 -rw-r--r-- 1 root root 2412 May 30  2023 default
 -rw-r--r-- 1 root root 3080 Aug  1 11:47 prime-distributor
 ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cat prime-distributor
-# Server Block for the Director Interface
+# /etc/nginx/sites-available$ cat prime-distributor
+#Server Block for the Director Interface
 server {
     server_name ccgsc-director.digitalbd.org;
     root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
@@ -354,3 +355,118 @@ pm2 kill
 [PM2][WARN] No process found
 [PM2] [v] All Applications Stopped
 [PM2] [v] PM2 Daemon Stopped
+
+
+
+
+the demo , or worker page was serving the director page
+
+
+
+Show thinking
+You are absolutely right to point that out. My apologies for the confusion. You have correctly identified the problem. When the worker page (ccgsc-demo...) shows the content of the director page, it's a classic Nginx configuration issue.
+
+Here is why it's happening and how to fix it permanently.
+
+The Root Cause: SSL Certificate Mismatch
+The problem is in your Nginx configuration file (/etc/nginx/sites-available/prime-distributor). Both of your server blocks are using the same SSL certificate, which belongs to ccgsc-demo.digitalbd.org.
+
+Nginx
+
+# In the server block for ccgsc-director.digitalbd.org
+ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem;
+
+# In the server block for ccgsc-demo.digitalbd.org
+ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem;
+When Nginx gets a request for either domain, it defaults to serving the content associated with the certificate it can validate, causing both domains to show the same page.
+
+The Final, Correct Nginx Solution
+To fix this, you must have a separate, valid SSL certificate for each domain and tell Nginx to use the correct one for each site.
+
+Action: Replace the entire content of your /etc/nginx/sites-available/prime-distributor file with this final, corrected version. I have highlighted the single line that needed to be changed.
+
+Nginx
+
+# Server Block for the Director Interface
+server {
+    server_name ccgsc-director.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index director.html;
+
+    listen 443 ssl;
+    # --- THIS IS THE CRITICAL FIX ---
+    # Use the certificate that matches the director's domain name
+    ssl_certificate /etc/letsencrypt/live/ccgsc-director.digitalbd.org/fullchain.pem; 
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-director.digitalbd.org/privkey.pem;
+    # --- END OF FIX ---
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        try_files $uri $uri/ @proxy;
+    }
+
+    location @proxy {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# Server Block for the Worker Interface
+server {
+    server_name ccgsc-demo.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index worker.html;
+
+    listen 443 ssl;
+    # This block was already correct
+    ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem; 
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        try_files $uri $uri/ @proxy;
+    }
+
+    location @proxy {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# HTTP to HTTPS redirects (no changes needed)
+server {
+    listen 80;
+    server_name ccgsc-director.digitalbd.org ccgsc-demo.digitalbd.org;
+    return 301 https://$host$request_uri;
+}
+What If You Don't Have the Second Certificate?
+If you save this file and sudo nginx -t gives you an error saying it can't find the certificate for ccgsc-director.digitalbd.org, you need to generate it using Certbot.
+
+Run this command to get the missing certificate:
+
+Bash
+
+sudo certbot --nginx -d ccgsc-director.digitalbd.org
+Certbot will automatically get the certificate and update your Nginx file for you. After it finishes, you just need to reload Nginx.
+
+Final Step: Restart and Verify
+Bash
+
+# Test the configuration
+sudo nginx -t
+
+# Reload Nginx to apply the changes
+sudo systemctl reload nginx
+After this, your server will be correctly configured, and each domain will show its own unique page.
+
+

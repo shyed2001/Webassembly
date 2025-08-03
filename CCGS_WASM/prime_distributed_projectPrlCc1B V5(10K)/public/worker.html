@@ -1,120 +1,163 @@
+<!-- Filename: worker.html , File Path: prime_distributed_projectPrlCc1B V5(10K)/public/worker.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Computation Worker Node</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Prime Computation - Worker</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>/* Your existing worker styles are fine */</style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            align-items: center; /* Center content horizontally */
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px; /* Smaller max-width for worker */
+        }
+        .header {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+        }
+        .status-box {
+            background-color: #ecf0f1;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            color: #2c3e50;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">Computation Worker Node</h1>
-        <p class="mb-2">Your unique Worker ID:</p>
-        <p id="worker-id" class="worker-id mb-6">Initializing...</p>
-        <p class="mb-2">Current Status:</p>
-        <p id="status" class="status-text text-blue-500">Starting...</p>
-        <div class="mt-4 text-sm text-gray-500">
-            <p>This page must remain open to contribute.</p>
-            <p><strong>Tasks completed by this worker:</strong> <span id="tasks-completed-count">0</span></p>
+
+    <h1 class="header">Distributed Prime Computation - Worker</h1>
+
+    <div class="container flex flex-col items-center mt-8">
+        <h2 class="section-title w-full text-center">Worker Status</h2>
+        <div id="worker-id-display" class="text-lg font-bold mt-2">Worker ID: <span id="my-worker-id">N/A</span></div>
+        <div id="status" class="status-box mt-4 w-full">Connecting to coordinator...</div>
+        <div class="mt-4 w-full text-center">
+            <p class="font-bold">Tasks Completed by me: <span id="my-tasks-completed">0</span></p>
+            <p class="font-bold">Primes Found by me: <span id="my-primes-found">0</span></p>
         </div>
     </div>
 
-    <script type="module">
-        import { getClientInfo } from './stats.js';
-        const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws';
-        // ... The rest of the fully persistent worker script from the previous answer goes here.
-        // This script includes IndexedDB for storing task history and LocalStorage for the worker ID.
+  <script type="module">
+    import { getClientInfo } from './stats.js'; // Import our new stats helper
 
-        const DB_NAME = 'WorkerDB';
-        const DB_VERSION = 1;
-        let db, workerSocket;
+    const statusDiv = document.getElementById('status');
+    const myWorkerIdSpan = document.getElementById('my-worker-id');
+    const myTasksCompletedSpan = document.getElementById('my-tasks-completed');
+    const myPrimesFoundSpan = document.getElementById('my-primes-found');
 
-        const statusDiv = document.getElementById('status');
-        const myWorkerIdSpan = document.getElementById('worker-id');
-        const tasksCompletedSpan = document.getElementById('tasks-completed-count');
-        const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+    let myWorkerId = null;
+    let myTasksCompleted = 0;
+    let myPrimesFound = 0n;
+    let workerSocket;
 
-        function getOrSetWorkerId() {
-            let id = localStorage.getItem('myWorkerId');
-            if (!id) {
-                id = `worker-${Math.random().toString(36).substring(2, 16)}`;
-                localStorage.setItem('myWorkerId', id);
-            }
-            return id;
+    // Replace with your actual WebSocket URL
+    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.108:8080'; // <-- ENSURE THIS IS YOUR SERVER IP
+    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.0.113:8080';
+    //const COORDINATOR_WS_URL_WORKER = 'ws://DESKTOP-NAF9NIA:8080';
+    //const COORDINATOR_WS_URL_WORKER = 'ws://91.99.238.128:8080';
+ const COORDINATOR_WS_URL_WORKER = 'ws://ccgsc-demo.digitalbd.org/ws';
+    // const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws'; // Use this for production
+    const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+
+    function generateWorkerId() {
+        return 'worker-' + Date.now().toString(36) + Math.random().toString(36).substring(2);
+    }
+
+    computationWorker.onmessage = (event) => {
+        const data = event.data;
+        switch (data.type) {
+            case 'status':
+                statusDiv.textContent = data.message;
+                break;
+            case 'stillWorking':
+                workerSocket.send(JSON.stringify({ type: 'stillWorking', workerId: myWorkerId, taskId: data.taskId, memory: data.memory }));
+                break;
+            case 'result':
+                const primeCountBigInt = BigInt(data.count);
+                myTasksCompleted++;
+                myPrimesFound += primeCountBigInt;
+                myTasksCompletedSpan.textContent = myTasksCompleted;
+                myPrimesFoundSpan.textContent = myPrimesFound.toLocaleString();
+                statusDiv.textContent = '✅ Task complete. Awaiting next task.';
+                workerSocket.send(JSON.stringify({ type: 'result', workerId: myWorkerId, taskId: data.taskId, count: data.count }));
+                break;
+            case 'error':
+                statusDiv.textContent = `❌ Error on task #${data.taskId}. Reporting to server.`;
+                workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: data.taskId, message: data.message }));
+                break;
+        }
+    };
+    
+    function connectWorkerSocket() {
+        if (myWorkerId === null) {
+            myWorkerId = generateWorkerId();
+            myWorkerIdSpan.textContent = myWorkerId; // Show full ID
         }
 
-        const myWorkerId = getOrSetWorkerId();
-        myWorkerIdSpan.textContent = myWorkerId;
+        statusDiv.textContent = 'Connecting to coordinator...';
+        workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
 
-        function initDB() {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onupgradeneeded = e => {
-                if (!e.target.result.objectStoreNames.contains('completedTasks')) {
-                    e.target.result.createObjectStore('completedTasks', { keyPath: 'taskId' });
-                }
-            };
-            request.onerror = e => console.error('DB Error:', e.target.errorCode);
-            request.onsuccess = e => {
-                db = e.target.result;
-                updateCompletedCount();
-                connectWorkerSocket();
-            };
-        }
+        workerSocket.onopen = () => {
+            statusDiv.textContent = '✅ Connected. Awaiting tasks.';
+            const clientInfo = getClientInfo(); // Get stats
+            workerSocket.send(JSON.stringify({ 
+                type: 'registerWorker', 
+                workerId: myWorkerId, 
+                browserInfo: clientInfo.browserInfo,
+                cpuCores: clientInfo.cpuCores
+            }));
+        };
 
-        computationWorker.onmessage = (event) => {
-            const data = event.data;
-            if (data.type === 'result') {
-                statusDiv.textContent = `✅ Task #${data.taskId} complete.`;
-                if(db) {
-                    const tx = db.transaction('completedTasks', 'readwrite');
-                    tx.objectStore('completedTasks').put({ taskId: data.taskId, count: data.count });
-                    tx.oncomplete = () => updateCompletedCount();
-                }
-            }
-            // Forward all messages to the main server
-            if (workerSocket && workerSocket.readyState === WebSocket.OPEN) {
-                workerSocket.send(JSON.stringify({ workerId: myWorkerId, ...data }));
+        workerSocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'task') {
+                computationWorker.postMessage({ task: data.task });
             }
         };
-        
-        function connectWorkerSocket() {
-            statusDiv.textContent = 'Connecting...';
-            workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
 
-            workerSocket.onopen = () => {
-                statusDiv.textContent = '✅ Connected. Awaiting tasks.';
-                const clientInfo = getClientInfo();
-                workerSocket.send(JSON.stringify({ 
-                    type: 'registerWorker', 
-                    workerId: myWorkerId, 
-                    browserInfo: clientInfo.browserInfo,
-                    cpuCores: clientInfo.cpuCores
-                }));
-            };
+        workerSocket.onclose = () => {
+            statusDiv.textContent = '❌ Disconnected. Reconnecting in 5 seconds...';
+            setTimeout(connectWorkerSocket, 5000);
+        };
 
-            workerSocket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === 'task') {
-                    statusDiv.textContent = `Computing task #${data.task.taskId}...`;
-                    computationWorker.postMessage({ task: data.task });
-                }
-            };
+        workerSocket.onerror = (error) => {
+            console.error('Worker WebSocket Error:', error);
+            workerSocket.close();
+        };
+    }
 
-            workerSocket.onclose = () => {
-                statusDiv.textContent = '❌ Disconnected. Reconnecting...';
-                setTimeout(connectWorkerSocket, 5000);
-            };
-        }
-
-        function updateCompletedCount() {
-            if (!db) return;
-            const countRequest = db.transaction('completedTasks', 'readonly').objectStore('completedTasks').count();
-            countRequest.onsuccess = () => {
-                tasksCompletedSpan.textContent = countRequest.result;
-            };
-        }
-
-        initDB();
-    </script>
+    connectWorkerSocket();
+</script>
 </body>
 </html>

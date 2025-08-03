@@ -12,17 +12,11 @@ pm2 stop all && pm2 kill && pm2 delete all
 
 pm2 restart coordinator
 
-
-sudo systemctl restart nginx
 sudo nginx -t
 sudo systemctl reload nginx
+sudo systemctl restart nginx
 sudo ufw allow 'Nginx Full'
-
-sudo pm2 stop all && pm2 kill && pm2 delete all && pm2 flush
-sudo pm2 start ecosystem.config.cjs
-
-
-sudo pm2 start ecosystem.config.cjs --only coordinator 
+sudo pm2 stop all && pm2 kill && pm2 delete all 
 sudo pm2 restart coordinator
 
 sudo pm2 kill

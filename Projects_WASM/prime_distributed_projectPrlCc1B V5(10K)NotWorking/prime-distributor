@@ -1,0 +1,66 @@
+# This block defines the location of your running Node.js application cluster
+upstream coordinator_cluster {
+    server 127.0.0.1:8080;
+}
+
+# Server Block for the Director Interface
+server {
+    server_name ccgsc-director.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index director.html;
+
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    ssl_certificate /etc/letsencrypt/live/ccgsc-director.digitalbd.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-director.digitalbd.org/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /ws/ {
+        proxy_pass http://coordinator_cluster;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Server Block for the Worker Interface
+server {
+    server_name ccgsc-demo.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index worker.html;
+
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /ws/ {
+        proxy_pass http://coordinator_cluster;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# This single block handles HTTP to HTTPS redirection for both domains
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ccgsc-director.digitalbd.org ccgsc-demo.digitalbd.org;
+    return 301 https://$host$request_uri;
+}

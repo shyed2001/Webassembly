@@ -8,9 +8,8 @@ import { exec } from 'child_process'; // We still need exec for the restart comm
 
 
 // --- CONFIGURATION ---
-// const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
-const wss = new WebSocketServer({ port: 8080, host: '127.0.0.1', path: '/ws' });
-console.log('Coordinator server running on ws://127.0.0.1:8080/ws');
+const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
+console.log('Coordinator server running on ws://0.0.0.0:8080');
 // console.log('Coordinator server running on ws://0.0.0.0:8080  ', wss.options.host, wss.options.port);
 // console.log('Coordinator server running on ws://192.168.1.108:8080');
  // WiFi 192.168.0.113
@@ -19,7 +18,7 @@ console.log('Coordinator server running on ws://127.0.0.1:8080/ws');
 // console.log('Coordinator server running on ws://DESKTOP-NAF9NIA:8080');
 // console.log('Coordinator server running on ws://0.0.0.0:8080  ', wss.options.host, wss.options.port);
 
-const N = 1000000000; // Total number to compute primes up to. Why: Large enough for significant computation. Data: Integer value.
+const N = 100000000; // Total number to compute primes up to. Why: Large enough for significant computation. Data: Integer value.
 // const N = 1000000000; // For testing purposes, you can reduce this
 // Why: Smaller range for quicker tests. Data: Integer value.
 // const N = 10000000; // For testing purposes, you can reduce this
@@ -178,11 +177,7 @@ setInterval(() => {
 }, HEARTBEAT_INTERVAL);
 
 wss.on('connection', (ws, req) => {
-    
-    //const clientIp = req.socket.remoteAddress;
-    //const clientIp = req.headers['x-real-ip'] || req.socket.remoteAddress;
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
+    const clientIp = req.socket.remoteAddress;
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
 
@@ -242,9 +237,6 @@ wss.on('connection', (ws, req) => {
                 logToDirector(`Starting new computation...`);
                 saveState();
                 workers.forEach((w, id) => assignTaskToAvailableWorker());
-                // VVVV --- ADD THIS LINE --- VVVV
-            if (directorSocket) directorSocket.send(JSON.stringify({ type: 'computationStateChanged', isRunning: true }));
-            // ^^^^ ----------------------- ^^^^
                 break;
 
             case 'pauseComputation':
@@ -252,9 +244,6 @@ wss.on('connection', (ws, req) => {
                     isRunning = false;
                     logToDirector('⏸️ Computation paused.');
                     saveState();
-                                    // VVVV --- ADD THIS LINE --- VVVV
-                if (directorSocket) directorSocket.send(JSON.stringify({ type: 'computationStateChanged', isRunning: false }));
-                // ^^^^ ----------------------- ^^^^
                 }
                 break;
 
@@ -263,21 +252,15 @@ wss.on('connection', (ws, req) => {
                     isRunning = true;
                     logToDirector('▶️ Computation resumed.');
                     saveState();
-
-                                    // VVVV --- ADD THIS LINE --- VVVV
-                if (directorSocket) directorSocket.send(JSON.stringify({ type: 'computationStateChanged', isRunning: true }));
-                // ^^^^ ----------------------- ^^^^
                     // Re-assign tasks to all available workers
                     assignTaskToAvailableWorker(); 
-                    
                 }
                 break;
             
             case 'restartServer':
                 logToDirector('🔄 Server restart initiated...');
                 // Use PM2's programmatic restart command
-//exec('pm2 restart coordinator', (error, stdout, stderr) => {
- exec('sudo pm2 restart coordinator', (error, stdout, stderr) => {                   
+                exec('pm2 restart coordinator', (error, stdout, stderr) => {
                     if (error) {
                         console.error(`exec error: ${error}`);
                         logToDirector(`Error restarting server: ${error.message}`);
@@ -292,54 +275,23 @@ wss.on('connection', (ws, req) => {
             // ... (all your other cases) ...
 
             // VVVV --- FIND YOUR 'clearState' CASE AND ADD A LOG --- VVVV
-// In: coordinator_server.js
-// Find the `switch (data.type)` block...
-
-            // ... (previous cases like 'restartServer')
-
-            // VVVV --- REPLACE your old 'clearState' case with this one --- VVVV
             case 'clearState':
-                logToDirector('Received command to clear state. Resetting server memory and deleting file...');
-
-                // 1. Delete the state file if it exists
+                console.log("[Debug] Entered 'clearState' case."); // <-- ADD THIS LINE
+                logToDirector('Received command to clear state file.');
                 try {
                     if (fs.existsSync(STATE_FILE)) {
                         fs.unlinkSync(STATE_FILE);
+                        logToDirector(`✅ Successfully deleted computation_state.json.`);
                         console.log(`[State] Deleted computation_state.json by director's command.`);
+                    } else {
+                        logToDirector(`ℹ️ State file not found. Nothing to delete.`);
+                        console.log(`[Debug] 'computation_state.json' not found. Nothing to do.`); // <-- Optional: add this too
                     }
                 } catch (err) {
                     console.error('Error deleting state file:', err);
                     logToDirector(`❌ Error deleting state file: ${err.message}`);
                 }
-
-                // 2. Reset the server's in-memory state variables
-                isRunning = false;
-                computationStartTime = null;
-                results = new Array(TOTAL_TASKS).fill(null);
-                taskQueue = []; // Clear the task queue
-                initializeTasks(); // Re-create the full task queue
-                
-                // 3. Immediately push the fresh, empty state back to the director's UI
-                if (directorSocket && directorSocket.readyState === WebSocket.OPEN) {
-                    logToDirector('✅ Server state cleared. Pushing clean state to UI.');
-                    const statePayload = {
-                        type: 'fullState',
-                        nValue: N,
-                        totalTasks: TOTAL_TASKS,
-                        isRunning: isRunning,
-                        results: results,
-                        workers: Array.from(workers.entries()).map(([id, worker]) => {
-                             // Reset individual worker stats for the UI as well
-                            worker.stats.tasksCompleted = 0;
-                            worker.stats.primesFound = 0n;
-                            const { ws, ...workerInfo } = worker;
-                            return [id, workerInfo];
-                        })
-                    };
-                    directorSocket.send(JSON.stringify(statePayload, bigIntReplacer));
-                }
                 break;
-            // ^^^^ --- END OF REPLACEMENT --- ^^^^
             // ^^^^ --------------------------------------------------- ^^^^
             
             // ... (rest of your cases) ...
