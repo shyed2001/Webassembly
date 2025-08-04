@@ -13,14 +13,23 @@ pm2 stop all && pm2 kill && pm2 delete all
 
 cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
 pm2 restart coordinator
+sudo pm2 restart coordinator
 
+
+
+
+sudo kill -9 $(sudo lsof -t -i:8080)
 # Navigate to your project directory
 cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
 sudo lsof -i :8080
 sleep 3
 sudo netstat -tulpn | grep 8080
 sleep 3
-
+sudo lsof -t -i :8080 | xargs -r sudo kill -9 
+# Find PIDs listening on 8080 and kill them forcefully
+sleep 3
+sudo lsof -i :8080
+sleep 3
 sudo systemctl restart nginx
 sleep 3
 sudo nginx -t
@@ -32,6 +41,8 @@ sleep 3
 sudo pm2 stop all && pm2 kill && pm2 delete all && pm2 flush 
 sleep 5
 pm2 stop all && pm2 kill && pm2 delete all && pm2 flush
+# This command finds and kills any process listening on 8080.
+sudo lsof -t -i :8080 | xargs -r sudo kill -9
 sleep 7
 sudo chown -R ccgsc-user1:www-data .
 sudo chmod -R g+w .

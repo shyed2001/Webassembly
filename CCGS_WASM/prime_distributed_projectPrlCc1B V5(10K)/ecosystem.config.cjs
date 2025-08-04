@@ -6,14 +6,17 @@ module.exports = {
     name      : "coordinator",
     script    : "coordinator_server.js",
     watch     : false,
-    user      : "www-data",
+    // user      : "www-data",
     
     // These lines enable cluster mode for full parallelism
-    //instances : "max",
-    // exec_mode : "cluster",
+    instances : "max",
+    exec_mode : "cluster",
     // --- ADD THESE LINES TO SPECIFY LOG PATHS ---
-    output    : "/var/log/coordinator/out.log",
-    error     : "/var/log/coordinator/error.log",
+    //output    : "/var/log/coordinator/out.log",
+    //error     : "/var/log/coordinator/error.log",
+    output    : "/Logs/coordinator/out.log",
+    error     : "/Logs/error.log", 
+     
     env       : {
       NODE_ENV: "production", 
     }
