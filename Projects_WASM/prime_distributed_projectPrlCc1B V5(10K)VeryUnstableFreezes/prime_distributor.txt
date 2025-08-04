@@ -1,0 +1,86 @@
+ccgsc-user1@shyed2001Vps:/etc/nginx/sites-available$ cat prime-distributor
+# /etc/nginx/sites-available$ cat prime-distributor
+#Server Block for the Director Interface
+server {
+    server_name ccgsc-director.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index director.html;
+
+    # Listen on port 443 for SSL connections
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+    # Main location block
+    location / {
+        # First, try to find a static file. If not found, pass to the @proxy location.
+        try_files $uri $uri/ @proxy;
+    }
+
+    # Named location for proxying to Node.js
+    location @proxy {
+        proxy_pass http://127.0.0.1:8080; # Your Node.js app
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    # --- ADD THESE TWO LINES ---
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    }
+}
+
+# Server Block for the Worker Interface
+server {
+    server_name ccgsc-demo.digitalbd.org;
+    root "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/public";
+    index worker.html;
+
+    # Listen on port 443 for SSL connections
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/ccgsc-demo.digitalbd.org/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+    # Main location block
+    location / {
+        # First, try to find a static file. If not found, pass to the @proxy location.
+        try_files $uri $uri/ @proxy;
+    }
+
+    # Named location for proxying to Node.js
+    location @proxy {
+        proxy_pass http://127.0.0.1:8080; # Your Node.js app
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    # --- ADD THESE TWO LINES ---
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+
+# HTTP to HTTPS redirects (managed by Certbot, no changes needed here)
+server {
+    if ($host = ccgsc-demo.digitalbd.org) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name ccgsc-demo.digitalbd.org;
+    return 404;
+}
+server {
+    if ($host = ccgsc-director.digitalbd.org) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name ccgsc-director.digitalbd.org;
+    return 404;
+}
