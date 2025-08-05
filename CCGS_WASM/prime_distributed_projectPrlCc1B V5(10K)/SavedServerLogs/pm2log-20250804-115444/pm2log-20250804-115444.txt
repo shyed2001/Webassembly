@@ -1,0 +1,35 @@
+[TAILING] Tailing last 15 lines for [coordinator] process (change the value with --lines option)
+/var/log/coordinator/error.log last 15 lines:
+0|coordina |   syscall: 'listen',
+0|coordina |   address: '127.0.0.1',
+0|coordina |   port: 8080
+0|coordina | }
+0|coordina | Error: listen EADDRINUSE: address already in use 127.0.0.1:8080
+0|coordina |     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+0|coordina |     at listenInCluster (node:net:1965:12)
+0|coordina |     at doListen (node:net:2139:7)
+0|coordina |     at process.processTicksAndRejections (node:internal/process/task_queues:83:21) {
+0|coordina |   code: 'EADDRINUSE',
+0|coordina |   errno: -98,
+0|coordina |   syscall: 'listen',
+0|coordina |   address: '127.0.0.1',
+0|coordina |   port: 8080
+0|coordina | }
+
+/var/log/coordinator/out.log last 15 lines:
+0|coordina | [Debug] Received message: {"type":"result","workerId":"worker-mdx1c1yo1770ffwhmsu","taskId":9997,"count":"4730"}
+0|coordina | [Debug] Received message: {"type":"stillWorking","workerId":"worker-mdx1c9o6y4xchhb9a2a","taskId":9999}
+0|coordina | [Debug] Received message: {"type":"result","workerId":"worker-mdx1c9o6y4xchhb9a2a","taskId":9999,"count":"4832"}
+0|coordina | [Debug] Received message: {"type":"stillWorking","workerId":"worker-mdx1ctl83d1be40n8z9","taskId":9986}
+0|coordina | [Debug] Received message: {"type":"result","workerId":"worker-mdx1ctl83d1be40n8z9","taskId":9986,"count":"4885"}
+0|coordina | [Debug] Received message: {"type":"stillWorking","workerId":"worker-mdx1cs5di06uwakm1ko","taskId":9988}
+0|coordina | [Debug] Received message: {"type":"result","workerId":"worker-mdx1cs5di06uwakm1ko","taskId":9988,"count":"4857"}
+0|coordina | [Debug] Received message: {"type":"stillWorking","workerId":"worker-mdx1crp2vm6d0l4qc99","taskId":9992}
+0|coordina | [Debug] Received message: {"type":"result","workerId":"worker-mdx1crp2vm6d0l4qc99","taskId":9992,"count":"4840"}
+0|coordina | [Debug] Received message: {"type":"stillWorking","workerId":"worker-mdx1lrx51yqyz65dqyp","taskId":9998}
+0|coordina | [Debug] Received message: {"type":"result","workerId":"worker-mdx1lrx51yqyz65dqyp","taskId":9998,"count":"4829"}
+0|coordina | Director disconnected.
+0|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdx1c1yo1770ffwhmsu
+0|coordina | [Heartbeat] Terminating unresponsive worker: worker-mdx1lrx51yqyz65dqyp
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdx1c1yo1770ffwhmsu","browserInfo":"Chrome on Android","cpuCores":8}
+

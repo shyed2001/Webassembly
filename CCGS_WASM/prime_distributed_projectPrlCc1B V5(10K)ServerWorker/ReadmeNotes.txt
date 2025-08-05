@@ -9,164 +9,14 @@ systemctl restart nginx
 ufw allow 'Nginx Full'
 
 pm2 stop all && pm2 kill && pm2 delete all 
-# Navigate to your project directory
 
-cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
-sudo pm2 restart coordinator
-sudo pm2 logs coordinator
+pm2 restart coordinator
 
-
-
-sudo kill -9 $(sudo lsof -t -i:8080)
-# Navigate to your project directory
-cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
-sudo lsof -i :8080
-sleep 13
-sudo netstat -tulpn | grep 8080
-sleep 13
-sudo lsof -t -i :8080 | xargs -r sudo kill -9 
-# Find PIDs listening on 8080 and kill them forcefully
-sleep 13
-sudo lsof -i :8080
-sleep 13
-sudo systemctl restart nginx
-sleep 13
 sudo nginx -t
-sleep 13
 sudo systemctl reload nginx
-sleep 3
-sudo ufw allow 'Nginx Full'
-sleep 13
-sudo pm2 stop all && pm2 kill && pm2 delete all && pm2 flush 
-sleep 15
-pm2 stop all && pm2 kill && pm2 delete all && pm2 flush
-# This command finds and kills any process listening on 8080.
-sudo lsof -t -i :8080 | xargs -r sudo kill -9
-sleep 17
-sudo chown -R ccgsc-user1:www-data .
-sudo chmod -R g+w .
-sudo mkdir -p /var/log/coordinator
-sudo chown www-data:www-data /var/log/coordinator
-sudo chmod 777 /var/log/coordinator
-sleep 17
-sudo pm2 start ecosystem.config.cjs
-sleep 17
-sudo pm2 list
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-sleep 10
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S"); \
-pm2 logs coordinator > "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt"
-sudo pm2 logs coordinator
-
-
-sudo pm2 logs
-
-
-sudo bash -c 'TIMESTAMP=$(date +"%Y%m%d-%H%M%S"); pm2 logs coordinator cat > "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2log-${TIMESTAMP}.txt"'
-# --- ADD THIS LINE ---
-# Run the new script to make the logs visible to the web
-/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/update_logs.sh
-
-
-
-
-sudo pm2 start ecosystem.config.cjs
-sleep 3
-sudo pm2 list
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-sudo pm2 logs coordinator > "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2log-${TIMESTAMP}.txt"
-sudo pm2 log 
-
-
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-# Start your main app (NOT the log viewer) with PM2
-# This will create 'app-log.json' inside your app folder
-pm2 start ecosystem.config.cjs --name "coordinator" --log ./pm2log-${TIMESTAMP}.json --log-type.json --log-type json
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-sudo kill -9 $(sudo lsof -t -i:8080)
-# Navigate to your project directory
-cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
-sudo lsof -i :8080
-sleep 3
-sudo netstat -tulpn | grep 8080
-sleep 3
-sudo lsof -t -i :8080 | xargs -r sudo kill -9 
-# Find PIDs listening on 8080 and kill them forcefully
-sleep 3
-sudo lsof -i :8080
-sleep 3
 sudo systemctl restart nginx
-sleep 3
-sudo nginx -t
-sleep 3
-sudo systemctl reload nginx
-sleep 3
 sudo ufw allow 'Nginx Full'
-sleep 3
-sudo pm2 stop all && pm2 kill && pm2 delete all && pm2 flush 
-sleep 5
-pm2 stop all && pm2 kill && pm2 delete all && pm2 flush
-# This command finds and kills any process listening on 8080.
-sudo lsof -t -i :8080 | xargs -r sudo kill -9
-sleep 7
-sudo chown -R ccgsc-user1:www-data .
-sudo chmod -R g+w .
-sudo mkdir -p /var/log/coordinator
-sudo chown www-data:www-data /var/log/coordinator
-sudo chmod 777 /var/log/coordinator
-sleep 7
-sudo pm2 start ecosystem.config.cjs
-sleep 3
-sudo pm2 list
-sleep 7
-# First, define your timestamp for a unique log file name
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-
-# Define the full path to your log file
-LIVE_LOG_FILE="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2log-${TIMESTAMP}.log"
-
-# Run pm2 logs in the background, continuously redirecting output to the file
-# Using 'nohup' so it continues even if your SSH session closes
-# The '&' puts the command in the background
-sudo nohup pm2 logs coordinator --raw > "$LIVE_LOG_FILE" 2>&1 &
-
-echo "Live PM2 logs are being written to: $LIVE_LOG_FILE"
-echo "You can view them live using: tail -f \"$LIVE_LOG_FILE\""
-
-
-
-
-
-
-# Corrected log redirection for a snapshot (not a live stream)
-sudo pm2 logs coordinator --nostream > "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2log-${TIMESTAMP}.txt"
-# If you want just the last N lines:
-# sudo pm2 logs coordinator --lines 100 --nostream > "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2log-${TIMESTAMP}.txt"
-
-
-
-
-sudo pm2 start ecosystem.config.cjs --only coordinator 
+sudo pm2 stop all && pm2 kill && pm2 delete all 
 sudo pm2 restart coordinator
 
 sudo pm2 kill
@@ -178,21 +28,6 @@ cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
 pm2 start coordinator_server.js --name coordinator -i 0
 pm2 startup
 sudo pm2 save
-
-
-
-sudo chown -R ccgsc-user1:www-data .
-sudo chmod -R g+w .
-sudo mkdir -p /var/log/coordinator
-sudo chown www-data:www-data /var/log/coordinator
-sudo chmod 777 /var/log/coordinator
-
-
-
-
-
-
-
 
 
 

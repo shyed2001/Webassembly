@@ -1,0 +1,47 @@
+[TAILING] Tailing last 15 lines for [coordinator] process (change the value with --lines option)
+/var/log/coordinator/error.log last 15 lines:
+0|coordina |   syscall: 'listen',
+0|coordina |   address: '127.0.0.1',
+0|coordina |   port: 8080
+0|coordina | }
+0|coordina | Error: listen EADDRINUSE: address already in use 127.0.0.1:8080
+0|coordina |     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+0|coordina |     at listenInCluster (node:net:1965:12)
+0|coordina |     at doListen (node:net:2139:7)
+0|coordina |     at process.processTicksAndRejections (node:internal/process/task_queues:83:21) {
+0|coordina |   code: 'EADDRINUSE',
+0|coordina |   errno: -98,
+0|coordina |   syscall: 'listen',
+0|coordina |   address: '127.0.0.1',
+0|coordina |   port: 8080
+0|coordina | }
+
+/var/log/coordinator/out.log last 15 lines:
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsbw7hllbjvfqg38","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5rqy20j9iubjycpfi","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsbpnw1kuq1iobr0q","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5sb6z0owxrtugjzq","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsbn25mb3lpvhae8e","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5sg9185fk15wsvng","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsc0y6unof1lzgxa","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5rkx5wixun9auvrg","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5rmdq825es52fp27","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordina | Coordinator server running on ws://127.0.0.1:8080/ws
+0|coordina | [State] Computation state loaded from /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/computation_state.json
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsc0y6unof1lzgxa","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsbpnw1kuq1iobr0q","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsm7rbc6egf9pk9aw","browserInfo":"Chrome on Android","cpuCores":8}
+0|coordina | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsbn25mb3lpvhae8e","browserInfo":"Firefox on Windows","cpuCores":8}
+
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwswa7lt1hsgq9p3np","browserInfo":"Chrome on Android","cpuCores":8}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdsukz7fq8pvq4rly6","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5rmdq825es52fp27","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5sb6z0owxrtugjzq","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwsbw7hllbjvfqg38","browserInfo":"Firefox on Windows","cpuCores":8}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdwtfqh39i2rqj0x3u9","browserInfo":"Chrome on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5sg9185fk15wsvng","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5rkx5wixun9auvrg","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5rkazqhjp0pf3dc","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5rqy20j9iubjycpfi","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerWorker","workerId":"worker-mdw5roba6vifw38t4tj","browserInfo":"Firefox on Windows","cpuCores":12}
+0|coordinator  | [Debug] Received message: {"type":"registerDirector"}
