@@ -1,4 +1,3 @@
-//File: prime_distributed_projectPrlCc1B%20V5%2810K%29/cpp_src/prime_library.h
 #pragma once
 #include <cstdint>
 

@@ -15,7 +15,7 @@ module.exports = {
     //output    : "/var/log/coordinator/out.log",
     //error     : "/var/log/coordinator/error.log",
     output    : "/Logs/coordinator/out.log",
-    error     : "/Logs/coordinator/error.log", 
+    error     : "/Logs/error.log", 
      
     env       : {
       NODE_ENV: "production", 

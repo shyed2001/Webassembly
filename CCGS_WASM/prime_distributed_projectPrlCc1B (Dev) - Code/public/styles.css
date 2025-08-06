@@ -1,0 +1,22 @@
+body {
+    font-family: sans-serif;
+    max-width: 800px;
+    margin: 2em auto;
+    background-color: #f4f4f9;
+    color: #333;
+}
+pre {
+    background-color: #eee;
+    padding: 1em;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+}
+button {
+    font-size: 1.1em;
+    padding: 10px 15px;
+    cursor: pointer;
+}
