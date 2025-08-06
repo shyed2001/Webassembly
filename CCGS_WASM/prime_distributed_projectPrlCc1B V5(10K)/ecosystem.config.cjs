@@ -9,13 +9,13 @@ module.exports = {
     // user      : "www-data",
     
     // These lines enable cluster mode for full parallelism
-    instances : "max",
-    exec_mode : "cluster",
+    // instances : "max",
+    // exec_mode : "cluster",
     // --- ADD THESE LINES TO SPECIFY LOG PATHS ---
     //output    : "/var/log/coordinator/out.log",
     //error     : "/var/log/coordinator/error.log",
-    output    : "/Logs/coordinator/out.log",
-    error     : "/Logs/coordinator/error.log", 
+    output    : "/pm2Logs/coordinator/out.log",
+    error     : "/pm2Logs/coordinator/error.log", 
      
     env       : {
       NODE_ENV: "production", 

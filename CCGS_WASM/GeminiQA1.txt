@@ -15,11 +15,12 @@ cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
 sudo pm2 restart coordinator
 sudo pm2 logs coordinator
 
+/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)
 
-
-sudo kill -9 $(sudo lsof -t -i:8080)
 # Navigate to your project directory
-cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/
+cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/ || cd /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)
+sleep5
+sudo kill -9 $(sudo lsof -t -i:8080)
 sudo lsof -i :8080
 sleep 13
 sudo netstat -tulpn | grep 8080
@@ -52,7 +53,6 @@ sleep 17
 sudo pm2 start ecosystem.config.cjs
 sleep 17
 sudo pm2 list
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 sleep 10
 sudo pm2 logs coordinator
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S") && \
