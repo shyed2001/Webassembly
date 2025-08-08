@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Director Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #333; }
+        .container { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 24px; margin: 20px auto; max-width: 1200px; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; user-select: none; }
+        .btn:hover:not(:disabled) { transform: translateY(-1px); }
+        .btn-primary { background-color: #3498db; color: white; }
+        .btn-warning { background-color: #f39c12; color: white; }
+        .btn-danger { background-color: #e74c3c; color: white; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #ddd; padding: 12px 8px; text-align: left; font-size: 0.9rem; word-break: break-all; }
+        th { background-color: #f9fafb; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body class="p-4">
+    <h1 class="text-3xl font-bold text-center text-gray-800 my-4">Distributed Computation Control Panel</h1>
+
+    <div class="container">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Controls</h2>
+        <div class="flex flex-wrap items-center gap-3">
+            <button id="start-btn" class="btn btn-primary" disabled>Connecting...</button>
+            <button id="pause-resume-btn" class="btn btn-warning" disabled>Pause</button>
+            <button id="restart-btn" class="btn btn-danger">Restart Server</button>
+            <button id="clearStateBtn" class="btn btn-warning">Clear State Data</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Overall Progress</h2>
+        <div style="background:#ecf0f1; border-radius:8px; padding:4px;">
+            <div id="overall-progress-bar" style="background:#27ae60; height:28px; border-radius:6px; text-align:center; color:white; font-weight:bold; line-height:28px; width:0%; transition: width 0.4s ease;">0%</div>
+        </div>
+        <div class="flex justify-between mt-2 text-gray-700 font-medium">
+            <span>Tasks: <span id="tasks-completed">0 / 0</span></span>
+            <span>Primes Found: <span id="running-total">0</span></span>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Worker Management (<span id="worker-count">0</span>)</h2>
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Full Worker ID</th>
+                        <th>Status</th>
+                        <th>IP Address</th>
+                        <th>Task</th>
+                        <th>Done</th>
+                        <th>Primes</th>
+                        <th>CPU</th>
+                        <th>Browser/OS</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="workers-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="text-center my-4">
+        <a href="./LogWorkerTaskProgressData.html" target="_blank" class="text-blue-600 hover:underline font-bold">View Live Logs &raquo;</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const COORDINATOR_WS_URL = 'wss://ccgsc-director.digitalbd.org/ws';
+            let socket;
+            let TOTAL_TASKS = 0;
+            let IS_RUNNING = false;
+            
+            const elements = {
+                startBtn: document.getElementById('start-btn'),
+                pauseResumeBtn: document.getElementById('pause-resume-btn'),
+                restartBtn: document.getElementById('restart-btn'),
+                clearStateBtn: document.getElementById('clearStateBtn'),
+                progressBar: document.getElementById('overall-progress-bar'),
+                tasksCompletedSpan: document.getElementById('tasks-completed'),
+                runningTotalSpan: document.getElementById('running-total'),
+                workerCountSpan: document.getElementById('worker-count'),
+                workersTableBody: document.getElementById('workers-table-body'),
+                nValueSpan: document.getElementById('n-value'),
+                computationStatusSpan: document.getElementById('computation-status')
+            };
+
+            function connectWebSocket() {
+                socket = new WebSocket(COORDINATOR_WS_URL);
+                elements.startBtn.textContent = 'Connecting...';
+
+                socket.onopen = () => {
+                    elements.startBtn.disabled = false;
+                    elements.startBtn.textContent = 'Start New Computation';
+                    socket.send(JSON.stringify({ type: 'registerDirector' }));
+                };
+
+                socket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'fullState') {
+                        updateUI(data);
+                    } else if (data.type === 'computationStateChanged') {
+                        IS_RUNNING = data.isRunning;
+                        updateUIStateButtons();
+                    } else {
+                        socket.send(JSON.stringify({ type: 'registerDirector' }));
+                    }
+                };
+
+                socket.onclose = () => {
+                    elements.startBtn.disabled = true;
+                    elements.startBtn.textContent = 'Reconnecting...';
+                    setTimeout(connectWebSocket, 5000);
+                };
+            }
+
+            function updateUI(state) {
+                TOTAL_TASKS = state.totalTasks || 0;
+                IS_RUNNING = state.isRunning || false;
+                
+                const completedCount = state.results?.filter(r => r !== null).length || 0;
+                const percentage = TOTAL_TASKS > 0 ? ((completedCount / TOTAL_TASKS) * 100).toFixed(1) : 0;
+                
+                if(elements.nValueSpan) elements.nValueSpan.textContent = state.nValue?.toLocaleString() || 'N/A';
+                elements.progressBar.style.width = `${percentage}%`;
+                elements.progressBar.textContent = `${percentage}%`;
+                elements.tasksCompletedSpan.textContent = `${completedCount} / ${TOTAL_TASKS}`;
+                elements.runningTotalSpan.textContent = state.results?.reduce((sum, count) => sum + BigInt(count || 0), 0n).toLocaleString() || '0';
+                
+                elements.workerCountSpan.textContent = state.workers?.length || 0;
+                elements.workersTableBody.innerHTML = '';
+                state.workers?.forEach(([id, info]) => {
+                    const row = elements.workersTableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${id}</td>
+                        <td>${info.status}</td>
+                        <td>${info.ipAddress}</td>
+                        <td>${info.currentTask ?? 'N/A'}</td>
+                        <td>${info.stats?.tasksCompleted || 0}</td>
+                        <td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td>
+                        <td>${info.cpuCores}</td>
+                        <td>${info.browserInfo || 'Unknown'}</td>
+                        <td><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm p-1">X</button></td>
+                    `;
+                });
+
+                updateUIStateButtons();
+            }
+
+            function updateUIStateButtons() {
+                if(elements.computationStatusSpan) elements.computationStatusSpan.textContent = IS_RUNNING ? 'Running' : 'Paused';
+                elements.startBtn.disabled = IS_RUNNING;
+                elements.pauseResumeBtn.disabled = TOTAL_TASKS === 0;
+                elements.pauseResumeBtn.textContent = IS_RUNNING ? 'Pause' : 'Resume';
+            }
+            
+            window.terminateWorker = (workerId) => {
+                if (confirm(`Terminate worker ${workerId}?`)) {
+                    socket.send(JSON.stringify({ type: 'terminateWorker', workerId: workerId }));
+                }
+            };
+
+            elements.startBtn.onclick = () => socket.send(JSON.stringify({ type: 'startComputation' }));
+            elements.pauseResumeBtn.onclick = () => socket.send(JSON.stringify({ type: IS_RUNNING ? 'pauseComputation' : 'resumeComputation' }));
+            elements.restartBtn.onclick = () => confirm('Restart the server?') && socket.send(JSON.stringify({ type: 'restartServer' }));
+            elements.clearStateBtn.onclick = () => confirm('Clear all state data?') && socket.send(JSON.stringify({ type: 'clearState' }));
+            
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>

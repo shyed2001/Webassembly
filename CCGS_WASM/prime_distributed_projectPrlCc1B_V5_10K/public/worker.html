@@ -1,4 +1,15 @@
-<!-- Filename: worker.html , File Path: prime_distributed_projectPrlCc1B V5(10K)/public/worker.html -->
+<!-- Filename: worker.html , File Path: prime_distributed_projectPrlCc1B_V5_10K/public/worker.html
+Description: This file is the HTML template for the worker interface in a distributed prime computation project.    It includes a WebSocket connection to a coordinator server, displays worker status, and handles tasks for prime number computation. The design is responsive and uses Tailwind CSS for styling.
+Author: CCGSC  
+  -->
+<!--
+    Distributed Prime Computation - Worker Interface
+    This HTML file serves as the worker interface for a distributed prime computation project.
+    It connects to a coordinator server via WebSocket, displays worker status, and handles tasks.
+    The design is responsive and uses Tailwind CSS for styling.
+    Author: CCGSC
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -89,6 +100,31 @@
  // const COORDINATOR_WS_URL_WORKER = 'ws://ccgsc-demo.digitalbd.org/ws';
     const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws'; // Use this for production
     const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+
+        // --- THIS IS THE NEW MEMORY REPORTING LOGIC ---
+        function reportMemoryUsage() {
+            // Check if the performance.memory API is available
+            if (performance.memory && workerSocket?.readyState === WebSocket.OPEN) {
+                const memoryInfo = {
+                    type: 'memoryUpdate',
+                    workerId: myWorkerId,
+                    // Convert bytes to a more readable Megabytes format
+                    memory: {
+                        usedJSHeapSize: (performance.memory.usedJSHeapSize / 1048576).toFixed(2) + ' MB',
+                    }
+                };
+                workerSocket.send(JSON.stringify(memoryInfo));
+            }
+        }
+        
+        // Report memory usage every 15 seconds
+        setInterval(reportMemoryUsage, 15000);
+        
+        // --- The rest of your worker.js logic remains the same ---
+        // (getOrSetWorkerId, initDB, connectWorkerSocket, etc.)
+
+
+
 
     function generateWorkerId() {
         return 'worker-' + Date.now().toString(36) + Math.random().toString(36).substring(2);

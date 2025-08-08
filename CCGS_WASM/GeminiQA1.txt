@@ -18,8 +18,8 @@ sudo pm2 logs coordinator
 /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)
 
 # Navigate to your project directory
-cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/ || cd /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)
-sleep5
+cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K || cd /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K
+sleep 5
 sudo kill -9 $(sudo lsof -t -i:8080)
 sudo lsof -i :8080
 sleep 13
@@ -57,7 +57,7 @@ sleep 10
 sudo pm2 logs coordinator
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S") && \
 nohup /usr/local/bin/pm2 logs coordinator > \
-"/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt" 2>&1 &
+"/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt" 2>&1 &
 sudo pm2 logs
 
 

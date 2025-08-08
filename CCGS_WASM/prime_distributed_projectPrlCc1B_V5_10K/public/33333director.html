@@ -30,40 +30,6 @@ It includes buttons to start, pause, resume, and restart the computation, as wel
         th { background-color: #f9fafb; font-weight: 600; }
         tr:nth-child(even) { background-color: #f9f9f9; }
     </style>
-
-    <!-- VVVV --- ADD THIS ENTIRE NEW STYLE BLOCK --- VVVV -->
-    <style>
-        /* Responsive Table Styles for Mobile */
-        @media screen and (max-width: 768px) {
-            table thead {
-                display: none; /* Hide the original table headers on mobile */
-            }
-            table tr {
-                display: block; /* Display each row as a separate block or card */
-                border: 1px solid #ddd;
-                margin-bottom: 1rem;
-                border-radius: 8px;
-                padding: 1rem;
-            }
-            table td {
-                display: flex; /* Use flexbox for label-value alignment */
-                justify-content: space-between;
-                padding: 0.5rem 0;
-                border-bottom: 1px solid #eee;
-                text-align: right; /* Align the data to the right */
-            }
-            table td:last-child {
-                border-bottom: none; /* Remove border from the last item in the card */
-            }
-            table td::before {
-                content: attr(data-label); /* Use the data-label as the header */
-                font-weight: 600;
-                text-align: left; /* Align the label to the left */
-                padding-right: 1rem;
-            }
-        }
-    </style>
-    <!-- ^^^^ --- END OF NEW STYLE BLOCK --- ^^^^ -->
 </head>
 <body class="p-4">
     <h1 class="text-3xl font-bold text-center text-gray-800 my-4">Distributed Computation Control Panel</h1>
@@ -101,22 +67,7 @@ It includes buttons to start, pause, resume, and restart the computation, as wel
         <h2 class="text-xl font-bold mb-4 text-gray-700">Worker Management</h2>
         <div class="overflow-x-auto">
             <table>
-                <!--<thead><tr><th>ID</th><th>Status</th><th>IP</th><th>Task</th><th>Done</th><th>Primes</th><th>CPU</th><th>Actions</th></tr></thead> -->
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Status</th>
-                        <th>IP</th>
-                        <th>Task</th>
-                        <th>Done</th>
-                        <th>Primes</th>
-                        <th>CPU</th>
-                        <th>Browser/OS</th>
-                        <th>Memory (JS Heap)</th> 
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-
+                <thead><tr><th>ID</th><th>Status</th><th>IP</th><th>Task</th><th>Done</th><th>Primes</th><th>CPU</th><th>Actions</th></tr></thead>
                 <tbody id="workers-table-body"></tbody>
             </table>
         </div>
@@ -265,48 +216,13 @@ It includes buttons to start, pause, resume, and restart the computation, as wel
                 elements.workersTableBody.innerHTML = '';
                 state.workers?.forEach(([id, info]) => {
                     const row = elements.workersTableBody.insertRow();
-                    row.innerHTML = `
-    <td data-label="ID">${id}</td>
-    <td data-label="Status">${info.status}</td>
-    <td data-label="IP Address">${info.ipAddress}</td>
-    <td data-label="Task">${info.currentTask ?? 'N/A'}</td>
-    <td data-label="Done">${info.stats?.tasksCompleted || 0}</td>
-    <td data-label="Primes">${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td>
-    <td data-label="CPU">${info.cpuCores}</td>
-    <td data-label="Browser/OS">${info.browserInfo || 'Unknown'}</td>
-    <td data-label="Memory">${info.memory?.usedJSHeapSize || 'N/A'}</td>
-    <td data-label="Actions"><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm p-1">X</button></td>
-`;
-                    // row.innerHTML = `<td>${id}</td><td>${info.status}</td><td class="p-2">${info.ipAddress}</td><td>${info.currentTask ?? 'N/A'}</td><td>${info.stats?.tasksCompleted || 0}</td><td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td><td>${info.cpuCores}</td><td>${info.browserInfo || 'Unknown'}</td>    <td>${info.memory?.usedJSHeapSize || 'N/A'}</td>                    <td><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm">X</button></td>`;
-                    //row.innerHTML = `<td class="p-2">${id.slice(0,8)}</td><td>${info.status}</td><td class="p-2">${info.ipAddress}</td><td>${info.currentTask ?? 'N/A'}</td><td>${info.stats?.tasksCompleted || 0}</td><td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td><td>${info.cpuCores}</td><td><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm">X</button></td>`;
+                    row.innerHTML = `<td class="p-2">${id.slice(0,8)}</td><td>${info.status}</td><td class="p-2">${info.ipAddress}</td><td>${info.currentTask ?? 'N/A'}</td><td>${info.stats?.tasksCompleted || 0}</td><td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td><td>${info.cpuCores}</td><td><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm">X</button></td>`;
                 });
 
                 elements.computationStatusSpan.textContent = IS_RUNNING ? 'Running' : 'Paused';
                 elements.startBtn.disabled = IS_RUNNING;
-
-
-
                 elements.pauseResumeBtn.disabled = TOTAL_TASKS === 0;
                 elements.pauseResumeBtn.textContent = IS_RUNNING ? 'Pause' : 'Resume';
-
-                 // --- THIS IS THE NEW LOGIC FOR THE PAUSE/RESUME BUTTON ---
-    // Enable the button only when a computation is active (running or paused)
-   /* elements.pauseResumeBtn.disabled = TOTAL_TASKS === 0 || completedCount === TOTAL_TASKS;
-
-    if (IS_RUNNING) {
-        elements.pauseResumeBtn.textContent = 'Pause';
-        elements.pauseResumeBtn.classList.remove('btn-secondary'); // Remove green color
-        elements.pauseResumeBtn.classList.add('btn-warning');   // Add orange color
-    } else {
-        elements.pauseResumeBtn.textContent = 'Resume';
-        elements.pauseResumeBtn.classList.remove('btn-warning'); // Remove orange color
-        elements.pauseResumeBtn.classList.add('btn-secondary'); // Add green color
-    }
-    // --- END OF NEW LOGIC ---
-*/
-            
-
-
             }
             
             window.terminateWorker = (workerId) => console.log(`Request to terminate ${workerId} should be sent via WebSocket`);

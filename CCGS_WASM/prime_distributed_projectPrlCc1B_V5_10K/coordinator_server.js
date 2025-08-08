@@ -356,6 +356,25 @@ wss.on('connection', (ws, req) => {
                 }
                 break;
 
+// In: coordinator_server.js
+// Inside the ws.on('message', ...) switch statement
+
+            // ... (after the 'terminateWorker' case)
+
+            case 'memoryUpdate':
+                const memWorker = workers.get(data.workerId);
+                if (memWorker) {
+                    // Add the memory info to the worker's data
+                    memWorker.memory = data.memory;
+                    // Send the updated worker info to the director
+                    updateDirectorWorkerInfo(data.workerId, memWorker);
+                }
+                break;
+
+            // case 'stillWorking':
+            // ... (rest of your cases)
+
+
             case 'stillWorking':
                 const activeWorker = workers.get(data.workerId);
                 if (activeWorker && activeWorker.isBusy) {
