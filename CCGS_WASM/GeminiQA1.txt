@@ -17,8 +17,33 @@ sudo pm2 logs coordinator
 
 /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)
 
+
+
+
+## 1 The Complete Script Bash
+sudo bash -c 'PROJECT_PATH="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K" && cd $PROJECT_PATH || exit 1; echo "--- Cleaning services ---"; lsof -t -i:8080 | xargs -r kill -9; pm2 stop all && pm2 delete all && pm2 flush; echo "--- Setting secure permissions ---"; chown -R ccgsc-user1:www-data .; find . -type d -exec chmod 2775 {} +; find . -type f -exec chmod 0664 {} +; echo "--- Configuring log directory ---"; mkdir -p /var/log/coordinator; chown www-data:www-data /var/log/coordinator; chmod 775 /var/log/coordinator; echo "--- Restarting Nginx ---"; ufw allow "Nginx Full"; nginx -t && systemctl restart nginx; echo "--- Starting application ---"; pm2 start ecosystem.config.cjs; echo "--- Deployment complete ---"; pm2 list'
+&& sleep 3;
+# after that the below code
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+OUTPUT_FILE="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt"
+&& sleep 3;
+# This starts the background process and fixes file ownership
+sudo sh -c "nohup pm2 logs coordinator --raw >> '$OUTPUT_FILE' 2>&1 &" && sleep 1 && sudo chown ccgsc-user1:ccgsc-user1 "$OUTPUT_FILE"
+# txt file log process ok, txt log file created
+&& sleep 3;
+sudo pm2 logs
+####################
+
+## 2 The Complete One-Line Script Bash
+sudo bash -c 'PROJECT_PATH="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K" && cd $PROJECT_PATH || exit 1; echo "--- Cleaning services ---"; lsof -t -i:8080 | xargs -r kill -9; sleep 2; pm2 stop all && pm2 delete all && pm2 flush; echo "--- Setting secure permissions ---"; chown -R ccgsc-user1:www-data .; find . -type d -exec chmod 2775 {} +; find . -type f -exec chmod 0664 {} +; echo "--- Configuring log directory ---"; mkdir -p /var/log/coordinator; chown www-data:www-data /var/log/coordinator; chmod 775 /var/log/coordinator; echo "--- Restarting Nginx ---"; ufw allow "Nginx Full"; nginx -t && systemctl restart nginx; echo "--- Starting application ---"; pm2 start ecosystem.config.cjs; echo "--- Deployment complete ---"; pm2 list; sleep 3; echo "--- Starting background log process ---"; TIMESTAMP=$(date +"%Y%m%d-%H%M%S") && OUTPUT_FILE="$PROJECT_PATH/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt" && (nohup pm2 logs coordinator --raw >> "$OUTPUT_FILE" 2>&1 &) && sleep 1 && chown ccgsc-user1:ccgsc-user1 "$OUTPUT_FILE" && sleep 3 && pm2 logs'
+# txt file log process ok, txt log file created
+
+
+
+#Server and App Re-Start Script from ccgsc-user1
 # Navigate to your project directory
 cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K || cd /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K
+#redundant path setup
 sleep 5
 sudo kill -9 $(sudo lsof -t -i:8080)
 sudo lsof -i :8080
@@ -55,33 +80,91 @@ sleep 17
 sudo pm2 list
 sleep 10
 sudo pm2 logs coordinator
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+OUTPUT_FILE="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt"
+# This starts the background process and fixes file ownership
+sudo sh -c "nohup pm2 logs coordinator --raw >> '$OUTPUT_FILE' 2>&1 &" && sleep 1 && sudo chown ccgsc-user1:ccgsc-user1 "$OUTPUT_FILE"
+# Connands to create custom Text Log File
+sudo pm2 logs
+# txt file log process fails, no txt log file created
+
+
+# One liner to start and log app from user
+sudo bash -c 'PROJECT_PATH="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K" && PROJECT_PATH2="~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K" && cd $PROJECT_PATH || cd $PROJECT_PATH2 ||exit 1; echo "--- Cleaning services ---"; lsof -t -i:8080 | xargs -r kill -9; pm2 stop all && pm2 delete all && pm2 flush; echo "--- Setting secure permissions ---"; chown -R ccgsc-user1:www-data .; find . -type d -exec chmod 2775 {} +; find . -type f -exec chmod 0664 {} +; echo "--- Configuring log directory ---"; mkdir -p /var/log/coordinator; chown www-data:www-data /var/log/coordinator; chmod 775 /var/log/coordinator; echo "--- Restarting Nginx ---"; ufw allow "Nginx Full"; nginx -t && systemctl restart nginx; echo "--- Starting application ---"; pm2 start ecosystem.config.cjs; echo "--- Deployment complete ---"; sleep 17; pm2 list; sleep 10; pm2 logs coordinator; echo "--- Starting background log process ---"; TIMESTAMP=$(date +"%Y%m%d-%H%M%S") && OUTPUT_FILE="$PROJECT_PATH/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt" && sh -c "nohup pm2 logs coordinator --raw >> $OUTPUT_FILE 2>&1 &" && sleep 1 && chown ccgsc-user1:ccgsc-user1 "$OUTPUT_FILE" && pm2 logs'
+# txt file log process fails, no txt log file created
+
+
+#Server and App Re-Start Script from root
+# Navigate to your project directory
+cd ~/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K || cd /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K
+#redundant path setup
+sleep 5
+sudo kill -9 $(sudo lsof -t -i:8080)
+sudo lsof -i :8080
+sleep 13
+sudo netstat -tulpn | grep 8080
+sleep 13
+sudo lsof -t -i :8080 | xargs -r sudo kill -9 
+# Find PIDs listening on 8080 and kill them forcefully
+sleep 13
+sudo lsof -i :8080
+sleep 13
+sudo systemctl restart nginx
+sleep 13
+sudo nginx -t
+sleep 13
+sudo systemctl reload nginx
+sleep 3
+sudo ufw allow 'Nginx Full'
+sleep 13
+sudo pm2 stop all && pm2 kill && pm2 delete all && pm2 flush 
+sleep 15
+pm2 stop all && pm2 kill && pm2 delete all && pm2 flush
+# This command finds and kills any process listening on 8080.
+sudo lsof -t -i :8080 | xargs -r sudo kill -9
+sleep 17
+sudo chown -R ccgsc-user1:www-data .
+sudo chmod -R g+w .
+sudo mkdir -p /var/log/coordinator
+sudo chown www-data:www-data /var/log/coordinator
+sudo chmod 777 /var/log/coordinator
+sleep 17
+sudo pm2 start ecosystem.config.cjs
+sleep 17
+sudo pm2 list
+sleep 10
+sudo pm2 logs coordinator
+# Connands to create custom Text Log File
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S") && \
-nohup /usr/local/bin/pm2 logs coordinator > \
+sudo nohup /usr/local/bin/pm2 logs coordinator > \
 "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt" 2>&1 &
 sudo pm2 logs
+# txt file log process fails, no txt log file created
 
 
+-------------------
 sudo bash -c 'TIMESTAMP=$(date +"%Y%m%d-%H%M%S"); pm2 logs coordinator cat > "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2log-${TIMESTAMP}.txt"'
 # --- ADD THIS LINE ---
 # Run the new script to make the logs visible to the web
 /home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B\ V5\(10K\)/update_logs.sh
+--------------------------
 
 
 
-
+------------------------------
 sudo pm2 start ecosystem.config.cjs
 sleep 3
 sudo pm2 list
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 sudo pm2 logs coordinator > "/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B V5(10K)/pm2log-${TIMESTAMP}.txt"
 sudo pm2 log 
-
+---------------------------------
 
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 # Start your main app (NOT the log viewer) with PM2
 # This will create 'app-log.json' inside your app folder
 pm2 start ecosystem.config.cjs --name "coordinator" --log ./pm2log-${TIMESTAMP}.json --log-type.json --log-type json
-
+----------------------------------------------------
 
 
 
