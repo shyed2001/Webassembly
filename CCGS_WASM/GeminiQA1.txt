@@ -20,10 +20,12 @@ sudo pm2 logs coordinator
 
 
 
-## 1 The Complete Script Bash
+## 1 The Complete Script Bash in two parts
 sudo bash -c 'PROJECT_PATH="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K" && cd $PROJECT_PATH || exit 1; echo "--- Cleaning services ---"; lsof -t -i:8080 | xargs -r kill -9; pm2 stop all && pm2 delete all && pm2 flush; echo "--- Setting secure permissions ---"; chown -R ccgsc-user1:www-data .; find . -type d -exec chmod 2775 {} +; find . -type f -exec chmod 0664 {} +; echo "--- Configuring log directory ---"; mkdir -p /var/log/coordinator; chown www-data:www-data /var/log/coordinator; chmod 775 /var/log/coordinator; echo "--- Restarting Nginx ---"; ufw allow "Nginx Full"; nginx -t && systemctl restart nginx; echo "--- Starting application ---"; pm2 start ecosystem.config.cjs; echo "--- Deployment complete ---"; pm2 list'
 && sleep 3;
+
 # after that the below code
+
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 OUTPUT_FILE="/home/ccgsc-user1/CCGSC/PA10KT2/prime_distributed_projectPrlCc1B_V5_10K/pm2TextLogsUIUX/pm2log-${TIMESTAMP}.txt"
 && sleep 3;
