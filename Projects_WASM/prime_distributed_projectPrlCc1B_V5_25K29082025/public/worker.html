@@ -1,0 +1,367 @@
+<!-- Filename: worker.html , File Path: prime_distributed_projectPrlCc1B_V5_10K/public/worker.html
+Description: This file is the HTML template for the worker interface in a distributed prime computation project.    It includes a WebSocket connection to a coordinator server, displays worker status, and handles tasks for prime number computation. The design is responsive and uses Tailwind CSS for styling.
+Author: CCGSC  
+  -->
+<!--
+    Distributed Prime Computation - Worker Interface
+    This HTML file serves as the worker interface for a distributed prime computation project.
+    It connects to a coordinator server via WebSocket, displays worker status, and handles tasks.
+    The design is responsive and uses Tailwind CSS for styling.
+    Author: CCGSC
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCGSC Distributed Prime Computation - Worker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            align-items: center; /* Center content horizontally */
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px; /* Smaller max-width for worker */
+        }
+        .header {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+        }
+        .status-box {
+            background-color: #ecf0f1;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 class="header">`Cloud Crowd Grid Super-Computing`</h1>
+        <h1>Join a global network of computers to solve complex problems and earn rewards</h1>
+    <h1>Distributed Prime Computation</h1>
+    <h1>Dear Valued Contributor you are a Web-Worker</h1>
+    <p> </p>
+    <h1>Thank you for your contribution</h1>
+    <div class="container flex flex-col items-center mt-8">
+        <h2 class="section-title w-full text-center">Worker Status</h2>
+        <div id="worker-id-display" class="text-lg font-bold mt-2">Worker ID: <span id="my-worker-id">N/A</span></div>
+        <div id="status" class="status-box mt-4 w-full">Connecting to coordinator...</div>
+        <div class="mt-4 w-full text-center">
+            <p class="font-bold">Tasks Completed by me: <span id="my-tasks-completed">0</span></p>
+            <p class="font-bold">Primes Found by me: <span id="my-primes-found">0</span></p>
+        </div>
+    </div>
+
+  <script type="module">
+    import { getClientInfo } from './stats.js'; // Import our new stats helper
+
+    const statusDiv = document.getElementById('status');
+    const myWorkerIdSpan = document.getElementById('my-worker-id');
+    const myTasksCompletedSpan = document.getElementById('my-tasks-completed');
+    const myPrimesFoundSpan = document.getElementById('my-primes-found');
+
+    let myWorkerId = null;
+    let myTasksCompleted = 0;
+    let myPrimesFound = 0n;
+    let workerSocket;
+
+    // Replace with your actual WebSocket URL
+    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.108:8080'; // <-- ENSURE THIS IS YOUR SERVER IP
+    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.0.113:8080';
+    //const COORDINATOR_WS_URL_WORKER = 'ws://DESKTOP-NAF9NIA:8080';
+    //const COORDINATOR_WS_URL_WORKER = 'ws://91.99.238.128:8080';
+ // const COORDINATOR_WS_URL_WORKER = 'ws://ccgsc-demo.digitalbd.org/ws';
+    const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws'; // Use this for production
+    const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+
+        // --- THIS IS THE NEW MEMORY REPORTING LOGIC ---
+        function reportMemoryUsage() {
+            // Check if the performance.memory API is available
+            if (performance.memory && workerSocket?.readyState === WebSocket.OPEN) {
+                const memoryInfo = {
+                    type: 'memoryUpdate',
+                    workerId: myWorkerId,
+                    // Convert bytes to a more readable Megabytes format
+                    memory: {
+                        usedJSHeapSize: (performance.memory.usedJSHeapSize / 1048576).toFixed(2) + ' MB',
+                    }
+                };
+                workerSocket.send(JSON.stringify(memoryInfo));
+            }
+        }
+        
+        // Report memory usage every 15 seconds
+        setInterval(reportMemoryUsage, 15000);
+        
+        // --- The rest of your worker.js logic remains the same ---
+        // (getOrSetWorkerId, initDB, connectWorkerSocket, etc.)
+
+
+
+
+    function generateWorkerId() {
+        return 'worker-' + Date.now().toString(36) + Math.random().toString(36).substring(2);
+    }
+
+    computationWorker.onmessage = (event) => {
+        const data = event.data;
+        switch (data.type) {
+            case 'status':
+                statusDiv.textContent = data.message;
+                break;
+            case 'stillWorking':
+                workerSocket.send(JSON.stringify({ type: 'stillWorking', workerId: myWorkerId, taskId: data.taskId, memory: data.memory }));
+                break;
+            case 'result':
+                const primeCountBigInt = BigInt(data.count);
+                myTasksCompleted++;
+                myPrimesFound += primeCountBigInt;
+                myTasksCompletedSpan.textContent = myTasksCompleted;
+                myPrimesFoundSpan.textContent = myPrimesFound.toLocaleString();
+                statusDiv.textContent = '✅ Task complete. Awaiting next task.';
+                workerSocket.send(JSON.stringify({ type: 'result', workerId: myWorkerId, taskId: data.taskId, count: data.count }));
+                break;
+            case 'error':
+                statusDiv.textContent = `❌ Error on task #${data.taskId}. Reporting to server.`;
+                workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: data.taskId, message: data.message }));
+                break;
+        }
+    };
+    
+    function connectWorkerSocket() {
+        if (myWorkerId === null) {
+            myWorkerId = generateWorkerId();
+            myWorkerIdSpan.textContent = myWorkerId; // Show full ID
+        }
+
+        statusDiv.textContent = 'Connecting to coordinator...';
+        workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
+
+        workerSocket.onopen = () => {
+            statusDiv.textContent = '✅ Connected. Awaiting tasks.';
+            const clientInfo = getClientInfo(); // Get stats
+            workerSocket.send(JSON.stringify({ 
+                type: 'registerWorker', 
+                workerId: myWorkerId, 
+                browserInfo: clientInfo.browserInfo,
+                cpuCores: clientInfo.cpuCores
+            }));
+        };
+
+        workerSocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'task') {
+                computationWorker.postMessage({ task: data.task });
+            }
+        };
+
+        workerSocket.onclose = () => {
+            statusDiv.textContent = '❌ Disconnected. Reconnecting in 5 seconds...';
+            setTimeout(connectWorkerSocket, 5000);
+        };
+
+        workerSocket.onerror = (error) => {
+            console.error('Worker WebSocket Error:', error);
+            workerSocket.close();
+        };
+    }
+
+    connectWorkerSocket();
+</script>
+<!-- ===== Content starts here (post-script) ===== -->
+
+<section class="container mt-8" aria-labelledby="welcome-title">
+  <h2 id="welcome-title" class="section-title w-full text-center">Welcome to CCGSC Worker</h2>
+  <p class="mt-2">
+    Join the Cloud Crowd Grid Super-Computing (CCGSC) platform and contribute your device’s idle processing power to large-scale computations—right from your browser. No installs. No fuss.
+  </p>
+  <p class="mt-2">
+    Your browser securely receives tasks from the coordinator, processes them in the background using Web Workers and WebAssembly, and returns the results. You’ll see your live stats in the <a href="#status" class="text-blue-600 font-semibold hover:underline">Worker Status</a> panel.
+  </p>
+  <div class="mt-4 flex justify-center">
+    <a href="#status" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 focus:outline-none focus:ring">
+      Start Contributing (Scroll to Status)
+    </a>
+  </div>
+</section>
+
+<section class="container" aria-labelledby="what-title">
+  <h3 id="what-title" class="section-title w-full text-center">What is CCGSC?</h3>
+  <p>
+    CCGSC is a distributed computing platform that harnesses unused CPU/GPU cycles from desktops, laptops, and mobile devices worldwide. Together, devices form a global supercomputer for scientific, engineering, and data-intensive workloads.
+  </p>
+</section>
+
+<section class="container" aria-labelledby="how-title">
+  <h3 id="how-title" class="section-title w-full text-center">How It Works</h3>
+  <ol class="list-decimal pl-6 space-y-2">
+    <li><span class="font-semibold">Join:</span> Open this worker page to connect to the coordinator.</li>
+    <li><span class="font-semibold">Receive a Task:</span> Your browser gets a small slice of a larger job (e.g., prime search, matrix multiplications for AI/ML, nested-loop kernels).</li>
+    <li><span class="font-semibold">Process:</span> Tasks run in the background via Web Workers and WebAssembly—no software installation required.</li>
+    <li><span class="font-semibold">Return & Earn:</span> Results are sent back and your contribution is recorded toward rewards/leaderboards.</li>
+  </ol>
+</section>
+
+<!-- ===== Current Focus Section ===== -->
+<section class="container" aria-labelledby="focus-title">
+  <h3 id="focus-title" class="section-title w-full text-center">
+    Current Focus: Mathematical Tests • Massively Parallel Task Testing • AI/ML (NN/CNN/ANN/GPT) Simulations • The Prime Number Challenge
+  </h3>
+
+  <p class="mt-2">
+    Our current initiative involves calculating prime numbers up to <span class="font-semibold">400&nbsp;billion</span>. By joining, you help tackle this massive mathematical challenge—one task at a time. You can monitor the grid’s overall progress below and see your individual contributions live in the <a href="#status" class="text-blue-600 font-semibold hover:underline">Worker Status</a> panel.
+  </p>
+
+  <!-- Overall project progress (optional hook for coordinator updates) -->
+  <div class="mt-4">
+    <div class="flex items-baseline justify-between">
+      <span class="font-semibold">Overall Project Progress</span>
+      <span id="overall-progress-text" class="text-sm tabular-nums">0.00%</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3 mt-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Overall project progress">
+      <div id="overall-progress-bar" class="h-3 rounded-full bg-blue-600" style="width: 0%"></div>
+    </div>
+    <p class="mt-2 text-sm text-gray-600">
+      Target limit: <span class="font-mono">400,000,000,000</span>. Progress is aggregated from all connected workers.
+    </p>
+  </div>
+
+  <!-- Pool health / throughput (optional hook) -->
+  <div class="mt-4">
+    <div class="flex items-baseline justify-between">
+      <span class="font-semibold">Pool Throughput (Tasks/min)</span>
+      <span id="pool-throughput-text" class="text-sm tabular-nums">—</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3 mt-2" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Pool throughput">
+      <div id="pool-throughput-bar" class="h-3 rounded-full bg-green-600" style="width: 0%"></div>
+    </div>
+    <p class="mt-2 text-sm text-gray-600">
+      Live throughput reflects coordinator updates. Your personal stats are shown above in <span class="font-semibold">Worker Status</span>.
+    </p>
+  </div>
+
+  <div class="mt-4 flex flex-wrap gap-3">
+    <a href="/developers.html" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 focus:outline-none focus:ring">
+      Join the Developerr’s Dashboard
+    </a>
+    <a href="#status" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-900 font-semibold hover:bg-gray-200 focus:outline-none focus:ring">
+      Jump to My Live Stats
+    </a>
+  </div>
+</section>
+
+<section class="container" aria-labelledby="why-title">
+  <h3 id="why-title" class="section-title w-full text-center">Why Participate?</h3>
+  <ul class="list-disc pl-6 space-y-2">
+    <li><span class="font-semibold">Be Part of Something Big:</span> Advance research and solve complex problems in science and technology.</li>
+    <li><span class="font-semibold">Earn Rewards:</span> Accumulate credit for completed tasks—recognized contributions, rankings, and future perks.</li>
+    <li><span class="font-semibold">Zero Installation:</span> Everything runs securely in your browser’s sandbox.</li>
+    <li><span class="font-semibold">Utilize Idle Power:</span> Put unused device time to work for good.</li>
+    <li><span class="font-semibold">Secure & Private:</span> We use your compute, not your personal files or data.</li>
+    <li><span class="font-semibold">Massively Scalable:</span> Millions of micro-tasks can run in parallel across the grid.</li>
+    <li><span class="font-semibold">Greener Compute:</span> Leverage existing hardware to reduce additional e-waste.</li>
+    <li><span class="font-semibold">Global Community:</span> Collaborate—silently and efficiently—with contributors around the world.</li>
+  </ul>
+</section>
+
+<section class="container" aria-labelledby="get-started-title">
+  <h3 id="get-started-title" class="section-title w-full text-center">Get Started Now</h3>
+  <p class="mt-2">
+    Ready to help? Scroll to your <span class="font-semibold">Worker Status</span> or open a dedicated worker tab to begin processing tasks immediately.
+  </p>
+  <div class="mt-4 flex justify-center gap-3">
+    <a href="#status" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 focus:outline-none focus:ring">
+      Go to Worker Status
+    </a>
+    <a href="https://ccgsc-demo.digitalbd.org" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-900 font-semibold hover:bg-gray-200 focus:outline-none focus:ring">
+      Learn More
+    </a>
+  </div>
+</section>
+
+<section class="container" aria-labelledby="join-title">
+  <h3 id="join-title" class="section-title w-full text-center">Join the Grid Worker</h3>
+  <p class="mt-2">
+    Your browser is the worker. Keep this tab open to stay connected and processing tasks. Prefer a dedicated tab?
+  </p>
+  <p class="mt-2">
+    <a href="https://ccgsc-demo.digitalbd.org/worker.html" class="text-blue-600 font-semibold hover:underline">Open a Dedicated Worker Tab</a>
+  </p>
+</section>
+
+<section class="container" aria-labelledby="support-title">
+  <h3 id="support-title" class="section-title w-full text-center">Stay Updated & Support</h3>
+  <p class="mt-2">
+    Follow updates on our website and community channels. Need help? Visit our
+    <a href="https://ccgsc-demo.digitalbd.org" class="text-blue-600 hover:underline font-semibold">support page</a>.
+  </p>
+  <p class="mt-2">
+    Thank you for contributing to CCGSC. Together, we turn idle compute into discoveries.
+  </p>
+</section>
+
+
+<script>
+  // non-invasive nicety: set the year without touching your existing scripts
+  (function(){ try { 
+    var y = new Date().getFullYear();
+    var el = document.getElementById('footer-year'); 
+    if (el) el.textContent = y; 
+  } catch(e){} })();
+</script>
+<!-- ===== Content ends here ===== -->
+
+</body>
+<!-- ===== Footer ===== -->
+<footer class="container mt-8 border-t border-gray-200 pt-4" role="contentinfo">
+  <nav aria-label="Footer">
+    <ul class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+      <li><a href="vision.html" class="text-blue-600 hover:underline">Project Vision</a></li>
+      <li><a href="security.html" class="text-blue-600 hover:underline">How We Ensure Security</a></li>
+      <li><a href=" page link" class="text-blue-600 hover:underline">View the Director’s Dashboard</a></li>
+      <!-- Extra placeholders -->
+      <li><a href="docs/" class="text-blue-600 hover:underline">Documentation</a></li>
+      <li><a href="api/" class="text-blue-600 hover:underline">API Reference</a></li>
+      <li><a href="changelog.html" class="text-blue-600 hover:underline">Changelog</a></li>
+      <li><a href="community/" class="text-blue-600 hover:underline">Community Forum</a></li>
+      <li><a href="PrivacyTerms.html" class="text-blue-600 hover:underline">Privacy Policy</a></li>
+      <li><a href="PrivacyTerms.html" class="text-blue-600 hover:underline">Terms of Use</a></li>
+      <li><a href="contact.html" class="text-blue-600 hover:underline">Contact Support</a></li>
+    </ul>
+  </nav>
+  <p class="mt-3 text-xs text-gray-500">
+    © <span id="footer-year"></span> CCGSC. All rights reserved.
+  </p>
+</footer>
+</html>

@@ -1,0 +1,317 @@
+<!-- 
+File path: prime_distributed_projectPrlCc1B%20V5%2810K%29/public/director.html
+This file is part of the Distributed Prime Computation project. 
+This HTML file serves as the main dashboard for the director, allowing control over the distributed computation tasks.
+It includes buttons to start, pause, resume, and restart the computation, as well as a detailed view of task progress and worker management.
+
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Director Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #333; }
+        .container { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 24px; margin: 20px auto; max-width: 1200px; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; user-select: none; }
+        .btn:hover:not(:disabled) { transform: translateY(-1px); }
+        .btn-primary { background-color: #3498db; color: white; }
+        .btn-secondary { background-color: #2ecc71; color: white; }
+        .btn-warning { background-color: #f39c12; color: white; }
+        .btn-danger { background-color: #e74c3c; color: white; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .progress-bar-container { background-color: #ecf0f1; border-radius: 8px; padding: 4px; overflow: hidden; }
+        .progress-bar-fill { background-color: #27ae60; height: 28px; border-radius: 6px; text-align: center; color: white; font-weight: bold; line-height: 28px; transition: width 0.4s ease-out; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #ddd; padding: 12px 8px; text-align: left; font-size: 0.9rem; }
+        th { background-color: #f9fafb; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+
+    <!-- VVVV --- ADD THIS ENTIRE NEW STYLE BLOCK --- VVVV -->
+    <style>
+        /* Responsive Table Styles for Mobile */
+        @media screen and (max-width: 768px) {
+            table thead {
+                display: none; /* Hide the original table headers on mobile */
+            }
+            table tr {
+                display: block; /* Display each row as a separate block or card */
+                border: 1px solid #ddd;
+                margin-bottom: 1rem;
+                border-radius: 8px;
+                padding: 1rem;
+            }
+            table td {
+                display: flex; /* Use flexbox for label-value alignment */
+                justify-content: space-between;
+                padding: 0.5rem 0;
+                border-bottom: 1px solid #eee;
+                text-align: right; /* Align the data to the right */
+            }
+            table td:last-child {
+                border-bottom: none; /* Remove border from the last item in the card */
+            }
+            table td::before {
+                content: attr(data-label); /* Use the data-label as the header */
+                font-weight: 600;
+                text-align: left; /* Align the label to the left */
+                padding-right: 1rem;
+            }
+        }
+    </style>
+    <!-- ^^^^ --- END OF NEW STYLE BLOCK --- ^^^^ -->
+</head>
+<body class="p-4">
+    <h1 class="text-3xl font-bold text-center text-gray-800 my-4">Distributed Computation Control Panel</h1>
+
+    <div class="container">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Dashboard & Controls</h2>
+        <div class="flex flex-wrap items-center gap-3 mb-4">
+            <button id="start-btn" class="btn btn-primary" disabled>Connecting...</button>
+            <button id="pause-resume-btn" class="btn btn-warning" disabled>Pause</button>
+            <button id="restart-btn" class="btn btn-danger">Restart Server</button>
+            <button id="clearStateBtn" class="btn btn-warning">Clear Previous Data</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-gray-600">
+            <div><strong>Status:</strong> <span id="computation-status" class="font-semibold">Idle</span></div>
+            <div><strong>Upper Limit (N):</strong> <span id="n-value" class="font-semibold">N/A</span></div>
+            <div><strong>Connected Workers:</strong> <span id="worker-count" class="font-semibold">0</span></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Overall Progress</h2>
+        <div class="progress-bar-container">
+            <div id="overall-progress-bar" class="progress-bar-fill" style="width: 0%;">0%</div>
+        </div>
+        <div class="flex justify-between mt-2 text-gray-700 font-medium">
+            <span>Tasks: <span id="tasks-completed">0 / 0</span></span>
+            <span>Primes Found: <span id="running-total">0</span></span>
+        </div>
+        <div class="mt-6 text-center">
+            <a href="./progress_details.html" target="_blank" class="text-blue-600 hover:underline font-bold">View Detailed Task Grid &raquo;</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Worker Management</h2>
+        <div class="overflow-x-auto">
+            <table>
+                <!--<thead><tr><th>ID</th><th>Status</th><th>IP</th><th>Task</th><th>Done</th><th>Primes</th><th>CPU</th><th>Actions</th></tr></thead> -->
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Status</th>
+                        <th>IP</th>
+                        <th>Task</th>
+                        <th>Done</th>
+                        <th>Primes</th>
+                        <th>CPU</th>
+                        <th>Browser/OS</th>
+                        <th>Memory (JS Heap)</th> 
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody id="workers-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="text-center my-4">
+        <a href="./LogWorkerTaskProgressData.html" target="_blank" class="text-blue-600 hover:underline font-bold">View Live Logs &raquo;</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const DB_NAME = 'ComputationDB';
+            const DB_VERSION = 1;
+            const channel = new BroadcastChannel('computation_channel');
+            let db;
+
+            const elements = {
+                startBtn: document.getElementById('start-btn'),
+                pauseResumeBtn: document.getElementById('pause-resume-btn'),
+                restartBtn: document.getElementById('restart-btn'),
+                clearStateBtn: document.getElementById('clearStateBtn'),
+                progressBar: document.getElementById('overall-progress-bar'),
+                tasksCompletedSpan: document.getElementById('tasks-completed'),
+                runningTotalSpan: document.getElementById('running-total'),
+                workerCountSpan: document.getElementById('worker-count'),
+                workersTableBody: document.getElementById('workers-table-body'),
+                computationStatusSpan: document.getElementById('computation-status'),
+                nValueSpan: document.getElementById('n-value'),
+            };
+
+            let TOTAL_TASKS = 0;
+            let IS_RUNNING = false;
+
+            function initDB() {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = e => {
+                    const dbInstance = e.target.result;
+                    if (!dbInstance.objectStoreNames.contains('state')) {
+                        dbInstance.createObjectStore('state', { keyPath: 'key' });
+                    }
+                    if (!dbInstance.objectStoreNames.contains('logs')) {
+                        dbInstance.createObjectStore('logs', { autoIncrement: true });
+                    }
+                };
+                request.onerror = e => console.error('DB Error:', e.target.errorCode);
+                request.onsuccess = e => {
+                    db = e.target.result;
+                    console.log('Database connection successful.');
+                    loadStateFromDB();
+                    connectWebSocket();
+                };
+            }
+
+            function connectWebSocket() {
+                //const socket = new WebSocket('ws://91.99.238.128:8080'); // Your WebSocket URL
+            const socket = new WebSocket('wss://ccgsc-director.digitalbd.org/ws'); // Your WebSocket URL
+// const socket = new WebSocket('ws://ccgsc-director.digitalbd.org/ws'); // Your WebSocket URL
+                elements.startBtn.textContent = 'Connecting...';
+                
+                socket.onopen = () => {
+                    elements.startBtn.disabled = false;
+                    elements.startBtn.textContent = 'Start New Computation';
+                    socket.send(JSON.stringify({ type: 'registerDirector' }));
+                };
+
+                socket.onmessage = async (event) => {
+                    const data = JSON.parse(event.data);
+                    await updateDB(data);
+                    channel.postMessage({ type: 'update' });
+                    loadStateFromDB();
+                };
+
+                socket.onclose = () => {
+                    elements.startBtn.disabled = true;
+                    elements.startBtn.textContent = 'Disconnected';
+                };
+                
+                elements.startBtn.onclick = () => socket.send(JSON.stringify({ type: 'startComputation' }));
+                elements.pauseResumeBtn.onclick = () => socket.send(JSON.stringify({ type: IS_RUNNING ? 'pauseComputation' : 'resumeComputation' }));
+                elements.restartBtn.onclick = () => confirm('Restart server?') && socket.send(JSON.stringify({ type: 'restartServer' }));
+                elements.clearStateBtn.onclick = () => confirm('Clear all state?') && socket.send(JSON.stringify({ type: 'clearState' }));
+            }
+
+            async function updateDB(data) {
+                if (!db) return;
+                const tx = db.transaction(['state', 'logs'], 'readwrite');
+                const stateStore = tx.objectStore('state');
+                const logStore = tx.objectStore('logs');
+
+                if (data.type === 'log') {
+                    logStore.add(data.message);
+                } else if (data.type === 'fullState') {
+                    data.key = 'currentState';
+                    stateStore.put(data);
+                } else {
+                    const req = stateStore.get('currentState');
+                    req.onsuccess = () => {
+                        const currentState = req.result || { results: [], workers: [] };
+                        if (data.type === 'progress') {
+                            currentState.results[data.taskId] = data.count;
+                        }
+                        if (data.type === 'workerUpdate') {
+                            const index = currentState.workers.findIndex(w => w[0] === data.workerId);
+                            if (index > -1) currentState.workers[index][1] = data.workerInfo;
+                            else currentState.workers.push([data.workerId, data.workerInfo]);
+                        }
+                        if (data.type === 'workerRemoved') {
+                            currentState.workers = currentState.workers.filter(w => w[0] !== data.workerId);
+                        }
+                        if (data.type === 'computationStateChanged') {
+                            currentState.isRunning = data.isRunning;
+                        }
+                        stateStore.put(currentState);
+                    };
+                }
+                return tx.complete;
+            }
+
+            function loadStateFromDB() {
+                if (!db) return;
+                const tx = db.transaction('state', 'readonly');
+                const store = tx.objectStore('state');
+                const request = store.get('currentState');
+
+                request.onsuccess = () => {
+                    const state = request.result;
+                    if (state) {
+                        TOTAL_TASKS = state.totalTasks;
+                        IS_RUNNING = state.isRunning;
+                        updateUI(state);
+                    }
+                };
+            }
+
+            function updateUI(state) {
+                const completedCount = state.results?.filter(r => r !== null).length || 0;
+                const percentage = TOTAL_TASKS > 0 ? ((completedCount / TOTAL_TASKS) * 100).toFixed(1) : 0;
+                
+                elements.nValueSpan.textContent = state.nValue?.toLocaleString() || 'N/A';
+                elements.progressBar.style.width = `${percentage}%`;
+                elements.progressBar.textContent = `${percentage}%`;
+                elements.tasksCompletedSpan.textContent = `${completedCount} / ${TOTAL_TASKS}`;
+                elements.runningTotalSpan.textContent = state.results?.reduce((sum, count) => sum + BigInt(count || 0), 0n).toLocaleString() || '0';
+                
+                elements.workerCountSpan.textContent = state.workers?.length || 0;
+                elements.workersTableBody.innerHTML = '';
+                state.workers?.forEach(([id, info]) => {
+                    const row = elements.workersTableBody.insertRow();
+                    row.innerHTML = `
+    <td data-label="ID">${id}</td>
+    <td data-label="Status">${info.status}</td>
+    <td data-label="IP Address">${info.ipAddress}</td>
+    <td data-label="Task">${info.currentTask ?? 'N/A'}</td>
+    <td data-label="Done">${info.stats?.tasksCompleted || 0}</td>
+    <td data-label="Primes">${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td>
+    <td data-label="CPU">${info.cpuCores}</td>
+    <td data-label="Browser/OS">${info.browserInfo || 'Unknown'}</td>
+    <td data-label="Memory">${info.memory?.usedJSHeapSize || 'N/A'}</td>
+    <td data-label="Actions"><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm p-1">X</button></td>
+`;
+                    // row.innerHTML = `<td>${id}</td><td>${info.status}</td><td class="p-2">${info.ipAddress}</td><td>${info.currentTask ?? 'N/A'}</td><td>${info.stats?.tasksCompleted || 0}</td><td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td><td>${info.cpuCores}</td><td>${info.browserInfo || 'Unknown'}</td>    <td>${info.memory?.usedJSHeapSize || 'N/A'}</td>                    <td><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm">X</button></td>`;
+                    //row.innerHTML = `<td class="p-2">${id.slice(0,8)}</td><td>${info.status}</td><td class="p-2">${info.ipAddress}</td><td>${info.currentTask ?? 'N/A'}</td><td>${info.stats?.tasksCompleted || 0}</td><td>${BigInt(info.stats?.primesFound || 0).toLocaleString()}</td><td>${info.cpuCores}</td><td><button onclick="window.terminateWorker('${id}')" class="btn btn-danger btn-sm">X</button></td>`;
+                });
+
+                elements.computationStatusSpan.textContent = IS_RUNNING ? 'Running' : 'Paused';
+                elements.startBtn.disabled = IS_RUNNING;
+
+
+
+                elements.pauseResumeBtn.disabled = TOTAL_TASKS === 0;
+                elements.pauseResumeBtn.textContent = IS_RUNNING ? 'Pause' : 'Resume';
+
+                 // --- THIS IS THE NEW LOGIC FOR THE PAUSE/RESUME BUTTON ---
+    // Enable the button only when a computation is active (running or paused)
+   /* elements.pauseResumeBtn.disabled = TOTAL_TASKS === 0 || completedCount === TOTAL_TASKS;
+
+    if (IS_RUNNING) {
+        elements.pauseResumeBtn.textContent = 'Pause';
+        elements.pauseResumeBtn.classList.remove('btn-secondary'); // Remove green color
+        elements.pauseResumeBtn.classList.add('btn-warning');   // Add orange color
+    } else {
+        elements.pauseResumeBtn.textContent = 'Resume';
+        elements.pauseResumeBtn.classList.remove('btn-warning'); // Remove orange color
+        elements.pauseResumeBtn.classList.add('btn-secondary'); // Add green color
+    }
+    // --- END OF NEW LOGIC ---
+*/
+            
+
+
+            }
+            
+            window.terminateWorker = (workerId) => console.log(`Request to terminate ${workerId} should be sent via WebSocket`);
+            initDB();
+        });
+    </script>
+</body>
+</html>

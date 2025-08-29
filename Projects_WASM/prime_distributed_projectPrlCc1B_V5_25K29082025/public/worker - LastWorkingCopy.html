@@ -1,0 +1,257 @@
+<!-- Filename: worker.html , File Path: prime_distributed_projectPrlCc1B_V5_10K/public/worker.html
+Description: This file is the HTML template for the worker interface in a distributed prime computation project.    It includes a WebSocket connection to a coordinator server, displays worker status, and handles tasks for prime number computation. The design is responsive and uses Tailwind CSS for styling.
+Author: CCGSC  
+  -->
+<!--
+    Distributed Prime Computation - Worker Interface
+    This HTML file serves as the worker interface for a distributed prime computation project.
+    It connects to a coordinator server via WebSocket, displays worker status, and handles tasks.
+    The design is responsive and uses Tailwind CSS for styling.
+    Author: CCGSC
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCGSC Distributed Prime Computation - Worker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            align-items: center; /* Center content horizontally */
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px; /* Smaller max-width for worker */
+        }
+        .header {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+        }
+        .status-box {
+            background-color: #ecf0f1;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 class="header">`Cloud Crowd Grid Super-Computing`</h1>
+        <h1>Join a global network of computers to solve complex problems and earn rewards</h1>
+    <h1>Distributed Prime Computation</h1>
+    <h1>Dear Valued Contributor you are a Web-Worker</h1>
+    <p> </p>
+    <h1>Thank you for your contribution</h1>
+    <div class="container flex flex-col items-center mt-8">
+        <h2 class="section-title w-full text-center">Worker Status</h2>
+        <div id="worker-id-display" class="text-lg font-bold mt-2">Worker ID: <span id="my-worker-id">N/A</span></div>
+        <div id="status" class="status-box mt-4 w-full">Connecting to coordinator...</div>
+        <div class="mt-4 w-full text-center">
+            <p class="font-bold">Tasks Completed by me: <span id="my-tasks-completed">0</span></p>
+            <p class="font-bold">Primes Found by me: <span id="my-primes-found">0</span></p>
+        </div>
+    </div>
+
+  <script type="module">
+    import { getClientInfo } from './stats.js'; // Import our new stats helper
+
+    const statusDiv = document.getElementById('status');
+    const myWorkerIdSpan = document.getElementById('my-worker-id');
+    const myTasksCompletedSpan = document.getElementById('my-tasks-completed');
+    const myPrimesFoundSpan = document.getElementById('my-primes-found');
+
+    let myWorkerId = null;
+    let myTasksCompleted = 0;
+    let myPrimesFound = 0n;
+    let workerSocket;
+
+    // Replace with your actual WebSocket URL
+    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.1.108:8080'; // <-- ENSURE THIS IS YOUR SERVER IP
+    // const COORDINATOR_WS_URL_WORKER = 'ws://192.168.0.113:8080';
+    //const COORDINATOR_WS_URL_WORKER = 'ws://DESKTOP-NAF9NIA:8080';
+    //const COORDINATOR_WS_URL_WORKER = 'ws://91.99.238.128:8080';
+ // const COORDINATOR_WS_URL_WORKER = 'ws://ccgsc-demo.digitalbd.org/ws';
+    const COORDINATOR_WS_URL_WORKER = 'wss://ccgsc-demo.digitalbd.org/ws'; // Use this for production
+    const computationWorker = new Worker('./computation_worker.js', { type: 'module' });
+
+        // --- THIS IS THE NEW MEMORY REPORTING LOGIC ---
+        function reportMemoryUsage() {
+            // Check if the performance.memory API is available
+            if (performance.memory && workerSocket?.readyState === WebSocket.OPEN) {
+                const memoryInfo = {
+                    type: 'memoryUpdate',
+                    workerId: myWorkerId,
+                    // Convert bytes to a more readable Megabytes format
+                    memory: {
+                        usedJSHeapSize: (performance.memory.usedJSHeapSize / 1048576).toFixed(2) + ' MB',
+                    }
+                };
+                workerSocket.send(JSON.stringify(memoryInfo));
+            }
+        }
+        
+        // Report memory usage every 15 seconds
+        setInterval(reportMemoryUsage, 15000);
+        
+        // --- The rest of your worker.js logic remains the same ---
+        // (getOrSetWorkerId, initDB, connectWorkerSocket, etc.)
+
+
+
+
+    function generateWorkerId() {
+        return 'worker-' + Date.now().toString(36) + Math.random().toString(36).substring(2);
+    }
+
+    computationWorker.onmessage = (event) => {
+        const data = event.data;
+        switch (data.type) {
+            case 'status':
+                statusDiv.textContent = data.message;
+                break;
+            case 'stillWorking':
+                workerSocket.send(JSON.stringify({ type: 'stillWorking', workerId: myWorkerId, taskId: data.taskId, memory: data.memory }));
+                break;
+            case 'result':
+                const primeCountBigInt = BigInt(data.count);
+                myTasksCompleted++;
+                myPrimesFound += primeCountBigInt;
+                myTasksCompletedSpan.textContent = myTasksCompleted;
+                myPrimesFoundSpan.textContent = myPrimesFound.toLocaleString();
+                statusDiv.textContent = '✅ Task complete. Awaiting next task.';
+                workerSocket.send(JSON.stringify({ type: 'result', workerId: myWorkerId, taskId: data.taskId, count: data.count }));
+                break;
+            case 'error':
+                statusDiv.textContent = `❌ Error on task #${data.taskId}. Reporting to server.`;
+                workerSocket.send(JSON.stringify({ type: 'error', workerId: myWorkerId, taskId: data.taskId, message: data.message }));
+                break;
+        }
+    };
+    
+    function connectWorkerSocket() {
+        if (myWorkerId === null) {
+            myWorkerId = generateWorkerId();
+            myWorkerIdSpan.textContent = myWorkerId; // Show full ID
+        }
+
+        statusDiv.textContent = 'Connecting to coordinator...';
+        workerSocket = new WebSocket(COORDINATOR_WS_URL_WORKER); 
+
+        workerSocket.onopen = () => {
+            statusDiv.textContent = '✅ Connected. Awaiting tasks.';
+            const clientInfo = getClientInfo(); // Get stats
+            workerSocket.send(JSON.stringify({ 
+                type: 'registerWorker', 
+                workerId: myWorkerId, 
+                browserInfo: clientInfo.browserInfo,
+                cpuCores: clientInfo.cpuCores
+            }));
+        };
+
+        workerSocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'task') {
+                computationWorker.postMessage({ task: data.task });
+            }
+        };
+
+        workerSocket.onclose = () => {
+            statusDiv.textContent = '❌ Disconnected. Reconnecting in 5 seconds...';
+            setTimeout(connectWorkerSocket, 5000);
+        };
+
+        workerSocket.onerror = (error) => {
+            console.error('Worker WebSocket Error:', error);
+            workerSocket.close();
+        };
+    }
+
+    connectWorkerSocket();
+</script>
+<h2 class="section-title w-full text-center">Welcome to CCGSC Worker</h2>
+<p>Join the Cloud Crowd Grid Super-Computing (CCGSC) platform to contribute your computer's processing power to solve complex problems and earn rewards. CCGSC is a distributed computing platform that connects computers worldwide to create a powerful supercomputer for scientific research, data analysis, and more.</p>
+<p>As a worker, you will receive tasks from the coordinator server, process them in the background using your web browser, and return the results. This allows you to contribute to large-scale computations without installing any software.</p>
+<p>Whether you're a researcher, developer, or just someone who wants to make a difference, CCGSC provides an easy and secure way to participate in distributed computing. By joining the grid, you become part of a global community dedicated to advancing science and technology.</p>
+
+<h3 class=".section-title w-full text-center"> <b>What is CCGSC?:</b></h3>
+   <p> "CCGSC is a distributed computing platform that harnesses the unused processing power of computers and various other types of smart devices like mobile devices etc, from around the world. By connecting to our grid, your device becomes part of a powerful supercomputer, helping to run large-scale scientific, engineering, and data analysis tasks that would otherwise require expensive hardware."
+        </p>
+<h3><b>How It Works</b></h3>
+<p> Join: Click the "Join the Grid Worker" link or button. A new tab will open, connecting you to our coordinator. </p>
+<p> Receive a Task: Your browser will be assigned a small piece of a larger computational problem, massively parallel tasks- such as finding prime numbers, 4x4 Matrix and or 4D Matrix multiplications for getting dot products and those can be used for AI ML LLM GPT training and testing etc, repeated nested loops and massive OOP tasks etc.</p>
+<p>  Process: Your computer will process the task in the background using Web-Browsers, Web-Workers, and WebAssembly, without installing any software. </p> 
+<p> <b>Contribute & Earn: </b> Once the task is complete, the result is sent back, and you are credited for your contribution.</p>
+<h3 class=".section-title w-full text-center"> <b>Why Join CCGSC?</b></h3>
+<p>  <b>Easy to Use:</b> No installation required. Just open the link in your browser and start contributing.</p>
+<p>  <b>Secure:</b> Your data remains private. We only use your computer's processing power, not your personal information.</p>
+<p>  <b>Scalable:</b> Our platform can handle millions of tasks simultaneously, making it suitable for large-scale computations.</p>
+<p>  <b>Environmentally Friendly:</b> By utilizing existing devices, we reduce the need for new hardware, minimizing electronic waste.</p>
+<p>  <b>Community Driven:</b> Join a global community of contributors who are passionate about science, technology, and making a difference.</p>
+<p>  <b>Make a Difference:</b> Your computer can help solve real-world problems, from scientific research to data analysis.</p>
+<p>  <b>Earn Rewards:</b> Contribute to the grid and earn rewards based on your computational contributions.</p>
+<p>  <b>Be Part of a Community:</b> Join a global network of contributors working together to tackle complex challenges.</p>
+<p>  <b>Support Research:</b> Help advance scientific research and technological innovation by providing computational power.</p>
+<p>  <b>Stay Informed:</b> Receive updates on the latest projects and developments in the CCGSC community.</p>
+
+<!-- incorporate and consolidate these text into these sections above or below.
+**"Why Participate?" Section**
+
+- Outline the benefits for the user.
+    
+- **Example Content:**
+    
+    - **Be Part of Something Big:** Contribute to meaningful research and complex problem-solving in science and technology.
+        
+    - **Earn Rewards:** Accumulate points for every task your computer completes, which can be redeemed for future rewards.
+        
+    - **Zero Installation:** Everything runs securely within your browser.
+        
+    - **Utilize Idle Power:** Make the most of your computer's resources when you're not using them. -->
+        
+
+
+
+
+<h3 class=".section-title w-full text-center"> <b>Get Started Now!</b></h3>
+<p>  <b>Join Now:</b> Click the "Join the Grid Worker" link or button to start contributing today!</p>
+<p>  <b>Stay Updated:</b> Follow us on social media and join our community forums to stay informed about the latest developments.</p>
+<p>  <b>Contact Us:</b> If you have any questions or need assistance    , feel free to reach out to our support team.</p>
+<p>  <b>Thank You:</b> We appreciate your interest in CCGSC and your willingness to contribute to the global computing community. Together, we can achieve great things!</p>
+<h3 class=".section-title w-full text-center"> <b>Join the Grid Worker</b></h3>
+<p>  <b>Ready to contribute?</b> Click the button below to join the grid worker and start making a difference!</p>
+<p>  <b>Join the Grid Worker:</b> <a href="https://ccgsc-demo.digitalbd.org/worker.html" class="text-blue-500 hover:underline">Join Now</a></p>
+<p>  <b>Learn More:</b> Visit our <a href="https://ccgsc-demo.digitalbd.org" class="text-blue-500 hover:underline">website</a> to learn more about CCGSC and how you can get involved.</p>
+<p>Get started now by clicking the "Join the Grid Worker" link or button below.</p>
+</body>
+</html>
